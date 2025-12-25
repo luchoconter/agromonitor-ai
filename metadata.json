@@ -1,0 +1,9 @@
+{
+  "name": "Prototipo Campo v1.0 (solo online)",
+  "description": "Una aplicación integral de monitoreo agronómico que permite gestionar Empresas, Campos, Lotes y Campañas con asistencia de IA.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}

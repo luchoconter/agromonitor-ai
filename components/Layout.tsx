@@ -1,0 +1,308 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Settings, ClipboardList, History, BarChart3, Users, LayoutList, Layers, Wheat, Bug, Sprout, Menu, X, LogOut, Sun, Moon, FlaskConical, ListTodo, FileText, Calendar, CloudOff, Cloud, RefreshCw, CheckCircle, AlertCircle, Loader2
+} from 'lucide-react';
+import { ViewState } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { useUI } from '../contexts/UIContext';
+import { getSyncStatus, getQueue } from '../services/offlineQueueService';
+import { syncPendingOperations } from '../services/autoSyncService';
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { currentUser, logout, isDarkMode, toggleTheme } = useAuth();
+  const { view: currentView, setView: onNavigate, headerTitle } = useUI();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<number | null>(null);
+  const [showOfflineDetails, setShowOfflineDetails] = useState(false);
+
+  // Monitor connection status and pending operations
+  useEffect(() => {
+    const updateStatus = () => {
+      setIsOnline(navigator.onLine);
+      const syncStatus = getSyncStatus();
+      setPendingCount(syncStatus.pendingCount);
+      setIsSyncing(syncStatus.isSyncing);
+      setLastSync(syncStatus.lastSync);
+    };
+
+    updateStatus();
+    
+    const handleOnline = () => {
+      setIsOnline(true);
+      updateStatus();
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      updateStatus();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Check every 2 seconds for pending operations
+    const interval = setInterval(updateStatus, 2000);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sincronización manual
+  const handleManualSync = async () => {
+    if (!isOnline || isSyncing || pendingCount === 0) return;
+    
+    setIsSyncing(true);
+    try {
+      await syncPendingOperations();
+    } catch (error) {
+      console.error('Error en sincronización manual:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Formatear tiempo desde última sincronización
+  const getLastSyncText = () => {
+    if (!lastSync) return 'Nunca';
+    
+    const diff = Date.now() - lastSync;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    
+    if (minutes < 1) return 'Hace un momento';
+    if (minutes < 60) return `Hace ${minutes} min`;
+    if (hours < 24) return `Hace ${hours}h`;
+    return 'Hace más de 24h';
+  };
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    if (!showOfflineDetails) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.offline-dropdown-container')) {
+        setShowOfflineDetails(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOfflineDetails]);
+
+  if (!currentUser) return null; // Safety check
+
+  const renderNavItems = () => {
+    const renderItem = (id: ViewState, label: string, Icon: React.ElementType) => {
+        if (currentUser?.role === 'operator' && ['analytics', 'recipes', 'crop-assignments', 'structure-hub', 'manage-seasons', 'manage-crops', 'manage-pests', 'manage-agrochemicals', 'manage-tasks', 'manage-team'].includes(id)) return null; 
+        
+        // MODIFICADO: Cliente (Company) solo ve Dashboard. Se ocultan home, history y todo lo de gestión.
+        if (currentUser?.role === 'company' && [
+            'home', 
+            'history', 
+            'sampling', 
+            'recipes', 
+            'crop-assignments', 
+            'structure-hub', 
+            'manage-seasons', 
+            'manage-crops', 
+            'manage-pests', 
+            'manage-agrochemicals', 
+            'manage-tasks', 
+            'manage-team'
+        ].includes(id)) return null;
+        
+        return (
+          <button
+            key={id}
+            onClick={() => {
+                onNavigate(id);
+                setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
+              currentView === id ? 'bg-agro-50 dark:bg-agro-900/30 text-agro-700 dark:text-agro-400 border-l-4 border-agro-600 dark:border-agro-500' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            <Icon className={`w-5 h-5 ${currentView === id ? 'text-agro-600 dark:text-agro-400' : 'text-gray-400 dark:text-gray-500'}`} />
+            <span className="font-medium">{label}</span>
+          </button>
+        );
+    };
+
+    return (
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {renderItem('home', 'Inicio / Muestreo', ClipboardList)}
+          
+          {(currentUser?.role === 'admin' || currentUser?.role === 'company') && (
+            <>
+                {renderItem('history', 'Historial Muestreos', History)}
+                {currentUser?.role === 'admin' && renderItem('recipes', 'Recetas', FileText)}
+                {renderItem('analytics', 'Dashboard', BarChart3)}
+            </>
+          )}
+          
+          {currentUser?.role === 'admin' && (
+            <>
+              <div className="pt-6 pb-2 px-4"><p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Gestión</p></div>
+              {renderItem('manage-team', 'Equipo y Clientes', Users)}
+              {renderItem('crop-assignments', 'Asignación Cultivos', LayoutList)}
+              {renderItem('structure-hub', 'Empresas/Lotes', Layers)}
+              
+              <div className="pt-4 pb-2 px-4"><p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Catálogos</p></div>
+              {renderItem('manage-seasons', 'Campañas', Calendar)}
+              {renderItem('manage-agrochemicals', 'Agroquímicos', FlaskConical)}
+              {renderItem('manage-tasks', 'Tareas', ListTodo)}
+              {renderItem('manage-crops', 'Cultivos', Wheat)}
+              {renderItem('manage-pests', 'Plagas', Bug)}
+            </>
+          )}
+        </nav>
+    );
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 dark:bg-gray-900 overflow-hidden font-sans text-gray-800 dark:text-gray-100 relative">
+      <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col shadow-sm z-10 hidden md:flex">
+        <div className="p-6 flex items-center space-x-2 border-b border-gray-100 dark:border-gray-700">
+          <div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-6 h-6 text-white" /></div>
+          <div><h1 className="text-xl font-bold text-gray-800 dark:text-white tracking-tight leading-none">AgroMonitor</h1><span className="text-[10px] text-gray-400 uppercase font-semibold">Consultoría</span></div>
+        </div>
+        {renderNavItems()}
+      </aside>
+
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+             <aside className="relative w-72 bg-white dark:bg-gray-800 h-full shadow-2xl flex flex-col animate-slide-in-left">
+                <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center space-x-2"><div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-5 h-5 text-white" /></div><span className="font-bold text-gray-800 dark:text-white">AgroMonitor</span></div>
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X className="w-6 h-6" /></button>
+                </div>
+                {renderNavItems()}
+                <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+                     <div className="flex items-center space-x-3 mb-4 px-2">
+                        <div className="w-8 h-8 rounded-full bg-agro-100 dark:bg-agro-900/50 flex items-center justify-center text-agro-700 dark:text-agro-400 font-bold">{currentUser.name.charAt(0)}</div>
+                        <div className="flex flex-col"><span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate w-32">{currentUser.name}</span><span className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{currentUser.role}</span></div>
+                     </div>
+                     <button onClick={logout} className="w-full flex items-center justify-center px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"><LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión</button>
+                </div>
+             </aside>
+        </div>
+      )}
+
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 md:px-8 shadow-sm shrink-0">
+          <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><Menu className="w-6 h-6" /></button>
+            <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 truncate">{headerTitle}</h2>
+          </div>
+          <div className="flex items-center space-x-2 md:space-x-6 shrink-0">
+             {/* Indicador de estado offline clickeable */}
+             <div className="relative offline-dropdown-container">
+               <button
+                 onClick={() => setShowOfflineDetails(!showOfflineDetails)}
+                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
+                   isOnline 
+                     ? 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600' 
+                     : 'bg-orange-50/90 dark:bg-orange-900/30 border-orange-200 dark:border-orange-700'
+                 }`}
+               >
+                 {isSyncing ? (
+                   <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                 ) : isOnline ? (
+                   <Cloud className="w-4 h-4 text-green-600 dark:text-green-400" />
+                 ) : (
+                   <CloudOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                 )}
+                 {pendingCount > 0 && (
+                   <div className="flex items-center gap-1.5">
+                     <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
+                     <span className="text-xs font-semibold text-orange-700 dark:text-orange-400">{pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}</span>
+                   </div>
+                 )}
+                 {!isOnline && pendingCount === 0 && (
+                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Modo offline</span>
+                 )}
+               </button>
+
+               {/* Dropdown de detalles */}
+               {showOfflineDetails && (
+                 <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                   {/* Estado de conexión */}
+                   <div className="flex items-center gap-2 mb-3">
+                     {isOnline ? (
+                       <CheckCircle className="w-4 h-4 text-green-500" />
+                     ) : (
+                       <AlertCircle className="w-4 h-4 text-orange-500" />
+                     )}
+                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                       {isOnline ? 'Conexión establecida' : 'Modo offline activo'}
+                     </span>
+                   </div>
+
+                   {/* Información de sincronización */}
+                   <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400 mb-3">
+                     <div className="flex justify-between">
+                       <span>Operaciones pendientes:</span>
+                       <span className="font-medium text-gray-800 dark:text-white">{pendingCount}</span>
+                     </div>
+                     <div className="flex justify-between">
+                       <span>Última sincronización:</span>
+                       <span className="font-medium text-gray-800 dark:text-white">{getLastSyncText()}</span>
+                     </div>
+                   </div>
+
+                   {/* Botón de sincronización manual */}
+                   {isOnline && pendingCount > 0 && !isSyncing && (
+                     <button
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         handleManualSync();
+                       }}
+                       className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md transition-colors"
+                     >
+                       <RefreshCw className="w-4 h-4" />
+                       Sincronizar ahora
+                     </button>
+                   )}
+
+                   {/* Mensaje informativo */}
+                   {!isOnline && pendingCount > 0 && (
+                     <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded text-xs text-orange-700 dark:text-orange-300">
+                       Los datos se sincronizarán automáticamente cuando vuelva la conexión.
+                     </div>
+                   )}
+
+                   {pendingCount === 0 && isOnline && (
+                     <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded text-xs text-green-700 dark:text-green-300">
+                       ✓ Todos los datos están sincronizados
+                     </div>
+                   )}
+                 </div>
+               )}
+             </div>
+             <button onClick={toggleTheme} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">{isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}</button>
+             <div className="hidden md:flex items-center space-x-3 border-l pl-6 border-gray-200 dark:border-gray-700">
+                 <div className="flex flex-col items-end mr-1"><span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{currentUser.name}</span><span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{currentUser.role}</span></div>
+                 <button onClick={logout} className="p-2 text-gray-500 hover:text-red-500 dark:text-gray-400 transition-colors"><LogOut className="w-5 h-5" /></button>
+             </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto p-4 md:p-8 relative">
+            {children}
+        </div>
+      </main>
+    </div>
+  );
+};

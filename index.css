@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #f8fafc;
+  overscroll-behavior-y: none;
+}
+
+.dark body {
+  background-color: #111827;
+}
+
+/* Ocultar flechas en inputs number */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Mejorar visibilidad del ícono de calendario en modo oscuro */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.dark input[type="date"]::-moz-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Leaflet Custom Marker */
+.custom-map-marker {
+  background: transparent;
+  border: none;
+}
+
+/* CRITICAL FIX: Leaflet vs Tailwind Conflict */
+/* Tailwind sets img max-width to 100%, breaking map tiles. This resets it. */
+.leaflet-pane img,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  max-width: none !important;
+  max-height: none !important;
+}
