@@ -38,10 +38,14 @@ export const useMonitoringForm = ({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [originalLocation, setOriginalLocation] = useState<GeoLocation | undefined | null>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // New: Phenology State
   const [phenology, setPhenology] = useState<string>('');
-  
+
+  // New: Stand Data State
+  const [plantsPerMeter, setPlantsPerMeter] = useState<string>('');
+  const [distanceBetweenRows, setDistanceBetweenRows] = useState<string>('0.52'); // Default to 0.52m (common for Soy/Corn)
+
   // Weather State
   const [currentWeather, setCurrentWeather] = useState<WeatherData | undefined>(undefined);
 
@@ -52,7 +56,7 @@ export const useMonitoringForm = ({
       if (record) {
         let loadedPestIds: string[] = [];
         let loadedValues: Record<string, string | number> = {};
-        
+
         if (record.pestData && record.pestData.length > 0) {
           loadedPestIds = record.pestData.map(p => p.pestId);
           record.pestData.forEach(p => loadedValues[p.pestId] = p.value);
@@ -61,7 +65,7 @@ export const useMonitoringForm = ({
         } else if (record.pestId) {
           loadedPestIds = [record.pestId];
         }
-        
+
         setSelectedPestIds(loadedPestIds);
         setPestValues(loadedValues);
         setObservationText(record.observations || '');
@@ -69,6 +73,10 @@ export const useMonitoringForm = ({
         setOriginalLocation(record.location);
         setCurrentWeather(record.weather); // Load existing weather
         setPhenology(record.phenology || ''); // Load phenology
+        if (record.standData) {
+          setPlantsPerMeter(record.standData.plantsPerMeter.toString());
+          setDistanceBetweenRows(record.standData.distanceBetweenRows.toString());
+        }
       }
     } else {
       resetForm();
@@ -77,17 +85,17 @@ export const useMonitoringForm = ({
 
   // NEW: Fetch Weather when submitting if we have location and no weather yet
   const fetchCurrentWeather = async (lat: number, lng: number): Promise<WeatherData | undefined> => {
-      const w = await fetchWeather(lat, lng);
-      if (w) {
-          return {
-              temp: w.current.temp,
-              humidity: w.current.humidity,
-              windSpeed: w.current.windSpeed,
-              condition: w.current.conditionLabel,
-              rainProb: w.daily[0]?.rainProb || 0
-          };
-      }
-      return undefined;
+    const w = await fetchWeather(lat, lng);
+    if (w) {
+      return {
+        temp: w.current.temp,
+        humidity: w.current.humidity,
+        windSpeed: w.current.windSpeed,
+        condition: w.current.conditionLabel,
+        rainProb: w.daily[0]?.rainProb || 0
+      };
+    }
+    return undefined;
   };
 
   const resetForm = useCallback(() => {
@@ -98,6 +106,8 @@ export const useMonitoringForm = ({
     setOriginalLocation(undefined);
     setCurrentWeather(undefined);
     setPhenology('');
+    setPlantsPerMeter('');
+    setDistanceBetweenRows('0.52');
   }, []);
 
   const handlePestChange = (selectedIds: string[]) => {
@@ -145,11 +155,11 @@ export const useMonitoringForm = ({
       // Fetch weather just before saving if we have location
       let weatherToSave = currentWeather;
       const locationToUse = editingMonitoringId ? originalLocation : currentLocation;
-      
+
       if (!weatherToSave && locationToUse && navigator.onLine) {
-          try {
-             weatherToSave = await fetchCurrentWeather(locationToUse.lat, locationToUse.lng);
-          } catch(e) { console.warn("Weather fetch failed", e); }
+        try {
+          weatherToSave = await fetchCurrentWeather(locationToUse.lat, locationToUse.lng);
+        } catch (e) { console.warn("Weather fetch failed", e); }
       }
 
       const pestDataPayload: MonitoringPestData[] = selectedPestIds.map(id => {
@@ -171,6 +181,21 @@ export const useMonitoringForm = ({
       const finalAudioDuration = audioDuration > 0 ? audioDuration : (recordToEdit?.media?.audioDuration || 0);
       const locationToSave = editingMonitoringId ? originalLocation : currentLocation;
 
+      // Stand Calculation
+      let standDataToSave = undefined;
+      if (plantsPerMeter && distanceBetweenRows) {
+        const ppm = parseFloat(plantsPerMeter);
+        const dist = parseFloat(distanceBetweenRows);
+        if (!isNaN(ppm) && !isNaN(dist) && dist > 0) {
+          const pph = Math.round((ppm / dist) * 10000);
+          standDataToSave = {
+            plantsPerMeter: ppm,
+            distanceBetweenRows: dist,
+            plantsPerHectare: pph
+          };
+        }
+      }
+
       const commonData = {
         companyId: selection.companyId,
         fieldId: selection.fieldId,
@@ -185,6 +210,7 @@ export const useMonitoringForm = ({
         location: locationToSave || null,
         weather: weatherToSave || null,
         phenology: phenology || null, // Guardar fenología
+        standData: standDataToSave, // NUEVO: Guardar Stand
         observations: observationText,
         severity: calculatedSeverity,
         media: {
@@ -211,7 +237,7 @@ export const useMonitoringForm = ({
 
       // Pequeño delay para permitir que el cache local se actualice antes de resetear
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       onSuccess();
       if (!editingMonitoringId) resetForm();
 
@@ -235,7 +261,7 @@ export const useMonitoringForm = ({
       // Auto fetch weather
       let weatherToSave: WeatherData | undefined = undefined;
       if (currentLocation && navigator.onLine) {
-           weatherToSave = await fetchCurrentWeather(currentLocation.lat, currentLocation.lng);
+        weatherToSave = await fetchCurrentWeather(currentLocation.lat, currentLocation.lng);
       }
 
       const now = new Date();
@@ -285,6 +311,10 @@ export const useMonitoringForm = ({
     originalLocation,
     phenology, // Expose state
     setPhenology, // Expose setter
+    plantsPerMeter,
+    setPlantsPerMeter,
+    distanceBetweenRows,
+    setDistanceBetweenRows,
     setObservationText,
     handlePestChange,
     handlePestValueChange,

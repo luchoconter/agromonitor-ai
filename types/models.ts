@@ -52,20 +52,21 @@ export interface Crop {
 
 export interface Agrochemical {
   id: string;
-  name: string; 
+  name: string;
   type: 'Herbicida' | 'Insecticida' | 'Fungicida' | 'Fertilizante' | 'Coadyuvante' | 'Semilla' | 'Otro';
-  activeIngredient?: string; 
+  activeIngredient?: string;
   ownerId: string;
   ownerName?: string;
   price?: number; // Precio numérico actual de mercado
-  priceUnit?: 'Lt' | 'Kg'; 
+  priceUnit?: 'Lt' | 'Kg';
 }
 
 export interface Task {
   id: string;
-  name: string; 
+  name: string;
   ownerId: string;
   ownerName?: string;
+  pricePerHectare?: number;
 }
 
 export interface PrescriptionItem {
@@ -82,27 +83,34 @@ export interface PrescriptionExecution {
   executedAt?: string; // ISO Date
   executedBy?: string; // User Name
   observation?: string;
+  audioUrl?: string; // Feedback del cliente (audio)
+  audioDuration?: number;
 }
 
 export interface Prescription {
   id: string;
   createdAt: number; // Timestamp numérico (igual que monitorings)
   companyId: string;
-  fieldId: string; 
-  plotIds: string[]; 
-  plotNames: string[]; 
+  fieldId: string;
+  plotIds: string[];
+  plotNames: string[];
+  // Custom metadata for specific plots in this recipe
+  plotMetadata?: Record<string, {
+    affectedHectares?: number;
+    observation?: string;
+  }>;
   items: PrescriptionItem[];
   taskIds: string[];
-  taskNames: string[]; 
+  taskNames: string[];
   notes: string;
-  audioUrl?: string; 
+  audioUrl?: string;
   audioDuration?: number;
   hasAudio?: boolean; // Flag para indicar si tiene audio (como monitorings)
   status: 'active' | 'archived';
   ownerId: string;
   ownerName?: string;
   // Map of plotId -> Execution Details
-  executionData?: Record<string, PrescriptionExecution>; 
+  executionData?: Record<string, PrescriptionExecution>;
 }
 
 export interface PrescriptionTemplate {
@@ -120,8 +128,17 @@ export interface PlotAssignment {
   seasonId: string;
   cropId: string;
   budget?: number; // Nuevo: Presupuesto asignado al lote para esta campaña
+  originalStand?: number; // Nuevo: Stand de plantas original/objetivo (pl/ha)
   ownerId: string;
   ownerName?: string;
+  history?: {
+    date: string; // ISO String
+    cropId: string;
+    originalStand?: number;
+    userId: string;
+    userName?: string;
+    action: 'created' | 'updated';
+  }[];
 }
 
 export interface GeoLocation {
@@ -152,7 +169,7 @@ export interface MonitoringRecord {
   plotId: string;
   seasonId: string;
   userId: string;
-  userName?: string; 
+  userName?: string;
   ownerId: string;
   ownerName?: string;
   sampleNumber: number;
@@ -160,16 +177,21 @@ export interface MonitoringRecord {
   pestId?: string;
   pestData?: MonitoringPestData[];
   date: string;
-  location?: GeoLocation | null; 
+  location?: GeoLocation | null;
   weather?: WeatherData; // NUEVO: Datos climáticos al momento del monitoreo
   phenology?: string; // NUEVO: Estadio fenológico (ej: V4, R1)
   observations: string;
   severity?: 'baja' | 'media' | 'alta';
   media?: {
-    photoUrl?: string | null; 
+    photoUrl?: string | null;
     hasAudio?: boolean;
     audioUrl?: string | null;
     audioDuration?: number;
+  };
+  standData?: {
+    plantsPerMeter: number;
+    distanceBetweenRows: number;
+    plantsPerHectare: number;
   };
 }
 
@@ -180,7 +202,7 @@ export interface LotSummary {
   plotId: string;
   seasonId: string;
   userId: string;
-  userName?: string; 
+  userName?: string;
   ownerId: string;
   ownerName?: string;
   date: string;

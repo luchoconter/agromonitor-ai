@@ -1,10 +1,10 @@
 
 import { collection, addDoc, updateDoc, doc, deleteDoc, getDoc, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Prescription, PrescriptionTemplate } from '../../types/models';
+import { Prescription, PrescriptionTemplate, PrescriptionExecution } from '../../types/models';
 import { uploadMedia, deleteMedia } from '../utils/mediaUtils';
 import { enqueueOperation } from '../offlineQueueService';
-import { addToLocalCache } from '../localCacheService';
+import { addToLocalCache, removeFromLocalCache } from '../localCacheService';
 import { saveBlobToIndexedDB } from '../indexedDBService';
 
 // Helper to remove undefined fields which Firestore does not support
@@ -22,13 +22,13 @@ const cleanUndefined = (obj: any) => {
 export const addPrescription = async (data: Omit<Prescription, 'id'>, audioBlobUrl?: string) => {
     // PASO 0: Detectar modo offline ANTES de cualquier operación
     const isOffline = !navigator.onLine;
-    
+
     if (isOffline) {
         console.log('📴 Modo offline detectado - encolando receta');
         // FLUJO OFFLINE
         const operationId = `presc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         let audioIndexedDBId;
-        
+
         // Guardar audio en IndexedDB si existe
         if (audioBlobUrl) {
             try {
@@ -38,7 +38,7 @@ export const addPrescription = async (data: Omit<Prescription, 'id'>, audioBlobU
                 console.error('❌ Error guardando audio en IndexedDB:', error);
             }
         }
-        
+
         // Crear documento con metadata completa (IGUAL que monitorings)
         const docToCache = {
             ...data,
@@ -47,31 +47,31 @@ export const addPrescription = async (data: Omit<Prescription, 'id'>, audioBlobU
             createdAt: Date.now(), // Timestamp numérico (igual que monitorings)
             audioUrl: null // Se subirá después
         };
-        
+
         // Encolar operación para sincronización posterior (con documento completo)
         enqueueOperation(
             'addPrescription',
             docToCache,
             audioIndexedDBId ? { audio: audioIndexedDBId } : undefined
         );
-        
+
         // Agregar a cache local para feedback inmediato
         addToLocalCache('prescriptions', docToCache);
-        
+
         // Pequeño delay para asegurar que el evento localCacheUpdated se procese
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         console.log('✅ Receta encolada para sincronización');
         return; // EXIT - No intentar Firebase
     }
-    
+
     // FLUJO ONLINE (EXISTENTE - NO MODIFICADO)
     let audioUrl = undefined;
     if (audioBlobUrl) {
         try {
             // Agregar timeout de 5s para detectar problemas de red rápidamente
             const uploadPromise = uploadMedia(audioBlobUrl, `prescriptions-audio/${data.companyId}/${Date.now()}.webm`);
-            const timeoutPromise = new Promise<never>((_, reject) => 
+            const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Upload timeout')), 5000)
             );
             audioUrl = await Promise.race([uploadPromise, timeoutPromise]);
@@ -80,20 +80,20 @@ export const addPrescription = async (data: Omit<Prescription, 'id'>, audioBlobU
             // Continuar sin audio
         }
     }
-    
+
     const payload = cleanUndefined({ ...data, audioUrl: audioUrl || null });
-    await addDoc(collection(db, 'prescriptions'), payload); 
+    await addDoc(collection(db, 'prescriptions'), payload);
 };
 
 export const updatePrescription = async (id: string, data: Partial<Prescription>, audioBlobUrl?: string) => {
     // PASO 0: Detectar modo offline
     const isOffline = !navigator.onLine;
-    
+
     if (isOffline) {
         console.log('📴 Modo offline detectado - encolando actualización de receta');
         // FLUJO OFFLINE
         let audioIndexedDBId;
-        
+
         // Guardar nuevo audio en IndexedDB si existe
         if (audioBlobUrl) {
             try {
@@ -103,33 +103,33 @@ export const updatePrescription = async (id: string, data: Partial<Prescription>
                 console.error('❌ Error guardando audio en IndexedDB:', error);
             }
         }
-        
+
         // Encolar operación
         enqueueOperation(
             'updatePrescription',
             { id, ...data },
             audioIndexedDBId ? { audio: audioIndexedDBId } : undefined
         );
-        
+
         // Actualizar cache local (buscar y reemplazar)
         // Nota: El cache local se limpiará automáticamente al sincronizar
-        
+
         // Pequeño delay para asegurar que el evento se procese
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         console.log('✅ Actualización de receta encolada');
         return; // EXIT
     }
-    
+
     // FLUJO ONLINE (EXISTENTE - NO MODIFICADO)
     let audioUrl = data.audioUrl;
-    
+
     // Si hay un nuevo audio grabado, subirlo y reemplazar el anterior
     if (audioBlobUrl) {
         try {
             // Agregar timeout de 5s
             const uploadPromise = uploadMedia(audioBlobUrl, `prescriptions-audio/updates/${id}_${Date.now()}.webm`);
-            const timeoutPromise = new Promise<never>((_, reject) => 
+            const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Upload timeout')), 5000)
             );
             audioUrl = await Promise.race([uploadPromise, timeoutPromise]);
@@ -214,14 +214,14 @@ export const splitPrescription = async (
 
 // NEW: Update execution status for a specific plot inside a prescription
 export const updatePrescriptionExecution = async (
-    prescriptionId: string, 
-    plotId: string, 
-    executed: boolean, 
-    observation: string, 
+    prescriptionId: string,
+    plotId: string,
+    executed: boolean,
+    observation: string,
     userName: string
 ) => {
     const docRef = doc(db, 'prescriptions', prescriptionId);
-    
+
     // Firestore allows updating nested fields in a map using dot notation
     // Key: executionData.{plotId}
     const updatePayload = {
@@ -239,22 +239,22 @@ export const updatePrescriptionExecution = async (
 export const deletePrescription = async (id: string) => {
     // PASO 0: Detectar modo offline
     const isOffline = !navigator.onLine;
-    
+
     if (isOffline) {
         console.log('📴 Modo offline detectado - encolando eliminación de receta');
         // FLUJO OFFLINE
         enqueueOperation('deletePrescription', { id });
-        
+
         // Remover del cache local
         removeFromLocalCache('prescriptions', id);
-        
+
         // Pequeño delay para asegurar que el evento se procese
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         console.log('✅ Eliminación de receta encolada');
         return; // EXIT
     }
-    
+
     // FLUJO ONLINE (EXISTENTE - NO MODIFICADO)
     const docRef = doc(db, 'prescriptions', id);
 
@@ -267,7 +267,7 @@ export const deletePrescription = async (id: string) => {
     }
 
     // 3. Delete document
-    await deleteDoc(docRef); 
+    await deleteDoc(docRef);
 };
 
 // TEMPLATES
@@ -275,31 +275,78 @@ export const addPrescriptionTemplate = async (data: Omit<PrescriptionTemplate, '
     await addDoc(collection(db, 'prescriptionTemplates'), data);
 };
 
-export const deletePrescriptionTemplate = async (id: string) => {
-    await deleteDoc(doc(db, 'prescriptionTemplates', id));
+export const deletePrescriptionTemplate = async (id: string): Promise<void> => {
+    const docRef = doc(db, 'prescriptionTemplates', id);
+    await deleteDoc(docRef);
+};
+
+export const markPrescriptionExecuted = async (
+    prescriptionId: string,
+    plotId: string,
+    executionData: PrescriptionExecution,
+    audioBlobUrl?: string
+): Promise<void> => {
+    try {
+        const docRef = doc(db, 'prescriptions', prescriptionId);
+
+        // Upload audio if present
+        if (audioBlobUrl) {
+            const path = `prescriptions/${prescriptionId}/execution_${plotId}_${Date.now()}.webm`;
+            const url = await uploadMedia(audioBlobUrl, path);
+            executionData.audioUrl = url;
+        }
+
+        // Update using dot notation for nested map
+        await updateDoc(docRef, {
+            [`executionData.${plotId}`]: cleanUndefined(executionData)
+        });
+    } catch (error) {
+        console.error("Error marking prescription executed:", error);
+        throw error;
+    }
 };
 
 // ASSIGNMENTS
+// ASSIGNMENTS
 export const savePlotAssignment = async (
-    assignmentId: string | undefined, 
-    plotId: string, 
-    seasonId: string, 
-    cropId: string, 
-    ownerId: string, 
-    ownerName?: string,
-    budget?: number // NEW ARGUMENT
+    assignmentId: string | undefined,
+    plotId: string,
+    seasonId: string,
+    cropId: string,
+    ownerId: string,
+    originalStand?: number,
+    ownerName?: string
 ) => {
+    const historyEntry = {
+        date: new Date().toISOString(),
+        cropId,
+        originalStand: originalStand,
+        userId: ownerId,
+        userName: ownerName,
+        action: assignmentId ? 'updated' : 'created'
+    };
+
     if (assignmentId) {
         // Si hay ID, actualizamos
-        const updateData: any = { cropId };
-        if (budget !== undefined) updateData.budget = budget;
-        
+        const updateData: any = {
+            cropId,
+            history: arrayUnion(historyEntry)
+        };
+        if (originalStand !== undefined) updateData.originalStand = originalStand;
+
         await updateDoc(doc(db, 'assignments', assignmentId), updateData);
     } else {
         // Si no hay ID, creamos
-        const newData: any = { plotId, seasonId, cropId, ownerId, ownerName };
-        if (budget !== undefined) newData.budget = budget;
-        
+        const newData: any = {
+            plotId,
+            seasonId,
+            cropId,
+            ownerId,
+            ownerName,
+            history: [historyEntry] // Inicializar historia
+        };
+        if (originalStand !== undefined) newData.originalStand = originalStand;
+
         await addDoc(collection(db, 'assignments'), newData);
     }
 };

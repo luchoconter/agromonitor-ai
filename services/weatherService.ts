@@ -50,16 +50,16 @@ export const getWeatherConditionLabel = (code: number): string => {
 
 export const fetchWeather = async (lat: number, lng: number): Promise<WeatherInfo | null> => {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`;
-    
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=8`;
+
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Weather API Error: ${response.statusText}`);
-    
+
     const data = await response.json();
-    
+
     if (data.error) throw new Error(data.reason || 'Open-Meteo API Error');
     if (!data.current || !data.daily) throw new Error('Invalid weather data format');
-    
+
     const current = {
       temp: data.current.temperature_2m,
       humidity: data.current.relative_humidity_2m,
@@ -74,7 +74,7 @@ export const fetchWeather = async (lat: number, lng: number): Promise<WeatherInf
       minTemp: data.daily.temperature_2m_min[index],
       rainProb: data.daily.precipitation_probability_max[index],
       conditionCode: data.daily.weather_code[index]
-    })).slice(0, 3); // Get today + next 2 days (or today included) - logic handled by slice
+    })).slice(0, 8); // Get today + next 7 days
 
     return { current, daily };
 

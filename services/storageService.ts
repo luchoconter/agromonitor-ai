@@ -5,5 +5,6 @@ export * from './repositories/structureRepository';
 export * from './repositories/catalogRepository';
 export * from './repositories/monitoringRepository';
 export * from './repositories/prescriptionRepository';
+export * from './repositories/trackRepository';
 export * from './syncService';
 export * from './utils/mediaUtils';

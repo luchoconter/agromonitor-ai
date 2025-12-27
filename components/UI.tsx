@@ -6,16 +6,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  className = '', 
-  isLoading, 
-  disabled, 
-  ...props 
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  variant = 'primary',
+  className = '',
+  isLoading,
+  disabled,
+  ...props
 }) => {
   const baseStyles = "inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm";
-  
+
   const variants = {
     primary: "bg-agro-600 text-white hover:bg-agro-700 focus:ring-agro-500 dark:bg-agro-500 dark:hover:bg-agro-600",
     secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-agro-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700",
@@ -24,7 +24,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <button 
+    <button
       className={`${baseStyles} ${variants[variant]} ${className}`}
       disabled={disabled || isLoading}
       {...props}
@@ -49,7 +49,7 @@ export const Input: React.FC<InputProps> = ({ label, error, className = '', type
     <div className="flex flex-col gap-1 w-full relative">
       {label && <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>}
       <div className="relative">
-        <input 
+        <input
           type={inputType}
           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-agro-500 focus:border-agro-500 outline-none transition-all bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 ${error ? 'border-red-500' : 'border-gray-300'} ${className} ${isPasswordType ? 'pr-10' : ''}`}
           {...props}
@@ -79,7 +79,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 export const Select: React.FC<SelectProps> = ({ label, options, error, placeholder, className = '', ...props }) => (
   <div className="flex flex-col gap-1 w-full">
     {label && <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>}
-    <select 
+    <select
       className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-agro-500 focus:border-agro-500 outline-none transition-all bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 ${error ? 'border-red-500' : 'border-gray-300'} ${className}`}
       {...props}
     >
@@ -101,12 +101,12 @@ interface MultiSelectProps {
   placeholder?: string;
 }
 
-export const MultiSelect: React.FC<MultiSelectProps> = ({ 
-  label, 
-  options, 
-  selectedValues, 
-  onChange, 
-  placeholder = "Seleccionar..." 
+export const MultiSelect: React.FC<MultiSelectProps> = ({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  placeholder = "Seleccionar..."
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,16 +134,16 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     .filter(opt => selectedValues.includes(opt.value))
     .map(opt => opt.label);
 
-  const displayValue = selectedLabels.length > 0 
-    ? (selectedLabels.length <= 2 ? selectedLabels.join(", ") : `${selectedLabels.length} seleccionados`) 
+  const displayValue = selectedLabels.length > 0
+    ? (selectedLabels.length <= 2 ? selectedLabels.join(", ") : `${selectedLabels.length} seleccionados`)
     : placeholder;
 
   return (
     <div className="flex flex-col gap-1 w-full relative" ref={containerRef}>
       {label && <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>}
-      
+
       {/* Trigger Button */}
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 flex justify-between items-center cursor-pointer hover:border-agro-500 transition-colors ${isOpen ? 'ring-2 ring-agro-500 border-agro-500' : 'border-gray-300'}`}
       >
@@ -162,8 +162,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
             options.map((opt) => {
               const isSelected = selectedValues.includes(opt.value);
               return (
-                <div 
-                  key={opt.value} 
+                <div
+                  key={opt.value}
                   onClick={() => handleToggle(opt.value)}
                   className="flex items-center px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-0 border-gray-50 dark:border-gray-700/50"
                 >
@@ -186,13 +186,14 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  zIndex?: number;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, zIndex = 50 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex }}>
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 shrink-0">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>

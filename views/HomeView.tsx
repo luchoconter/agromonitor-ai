@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Importer } from '../components/Importer';
-import { CheckCircle2, AlertTriangle, WifiOff, MapPin, Camera, StopCircle, Mic, ArrowDown, Flag, ShieldCheck, Sprout, Leaf, Flower, Minus, Plus } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, WifiOff, MapPin, Camera, StopCircle, Mic, ArrowDown, Flag, ShieldCheck, Sprout, Leaf, Flower, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { Select, Button, MultiSelect, Modal } from '../components/UI';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
@@ -20,6 +20,7 @@ const PhenologySelector: React.FC<{
     const type = value.startsWith('V') ? 'V' : (value.startsWith('R') ? 'R' : (value === 'Barbecho' ? 'Barbecho' : ''));
     const numVal = parseInt(value.slice(1)) || 0;
     const [stageNum, setStageNum] = useState(numVal);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         if (value.startsWith('V') || value.startsWith('R')) {
@@ -40,74 +41,99 @@ const PhenologySelector: React.FC<{
 
     const handleNumChange = (delta: number) => {
         if (!type || type === 'Barbecho') return;
-        const newNum = Math.max(0, stageNum + delta); // Allow 0 (Ve/Re equivalent)
+        let newNum = stageNum + delta;
+
+        // Limits
+        newNum = Math.max(0, newNum); // Min 0
+        if (type === 'R') newNum = Math.min(8, newNum); // Max R8
+
         setStageNum(newNum);
         onChange(`${type}${newNum}`);
     };
 
     return (
-        <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center gap-2 mb-2">
-                <Sprout className="w-4 h-4 text-agro-600 dark:text-agro-400" />
-                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">Estadio del Cultivo</span>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all">
+            <div
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center gap-2">
+                    <span className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors ${isExpanded ? 'bg-agro-600 text-white' : 'bg-agro-100 text-agro-700 dark:bg-agro-900/30 dark:text-agro-400'}`}>
+                        {type === 'R' ? <Flower className="w-4 h-4" /> : (type === 'V' ? <Leaf className="w-4 h-4" /> : <Sprout className="w-4 h-4" />)}
+                    </span>
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Estadio del Cultivo</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                    {value && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded shadow-sm border ${type === 'R' ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800' :
+                                type === 'V' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800' :
+                                    'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                            }`}>
+                            {value}
+                        </span>
+                    )}
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-                {/* Type Selector */}
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={() => handleTypeSelect('V')}
-                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'V' ? 'bg-green-100 text-green-700 border-2 border-green-500 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
-                    >
-                        <Leaf className="w-4 h-4 mb-1" />
-                        Vegetativo
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTypeSelect('R')}
-                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'R' ? 'bg-amber-100 text-amber-700 border-2 border-amber-500 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
-                    >
-                        <Flower className="w-4 h-4 mb-1" />
-                        Reproductivo
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTypeSelect('Barbecho')}
-                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'Barbecho' ? 'bg-gray-200 text-gray-700 border-2 border-gray-400' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
-                    >
-                        <Minus className="w-4 h-4 mb-1" />
-                        Barbecho
-                    </button>
-                </div>
-
-                {/* Stage Slider (Only if V or R) */}
-                {(type === 'V' || type === 'R') && (
-                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-2 border border-gray-200 dark:border-gray-600 animate-fade-in">
+            {isExpanded && (
+                <div className="p-4 pt-0 flex flex-col gap-3 animate-fade-in-down">
+                    {/* Type Selector */}
+                    <div className="flex gap-2">
                         <button
                             type="button"
-                            onClick={() => handleNumChange(-1)}
-                            className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 active:scale-95 transition-transform"
+                            onClick={() => handleTypeSelect('V')}
+                            className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'V' ? 'bg-green-100 text-green-700 border-2 border-green-500 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
                         >
-                            <Minus className="w-5 h-5" />
+                            <Leaf className="w-4 h-4 mb-1" />
+                            Vegetativo
                         </button>
-
-                        <div className="text-center w-24">
-                            <span className={`text-3xl font-black ${type === 'V' ? 'text-green-600' : 'text-amber-500'}`}>
-                                {type}{stageNum}
-                            </span>
-                        </div>
-
                         <button
                             type="button"
-                            onClick={() => handleNumChange(1)}
-                            className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 active:scale-95 transition-transform"
+                            onClick={() => handleTypeSelect('R')}
+                            className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'R' ? 'bg-amber-100 text-amber-700 border-2 border-amber-500 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
                         >
-                            <Plus className="w-5 h-5" />
+                            <Flower className="w-4 h-4 mb-1" />
+                            Reproductivo
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleTypeSelect('Barbecho')}
+                            className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold flex flex-col items-center justify-center transition-all ${type === 'Barbecho' ? 'bg-gray-200 text-gray-700 border-2 border-gray-400' : 'bg-white dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-600'}`}
+                        >
+                            <Minus className="w-4 h-4 mb-1" />
+                            Barbecho
                         </button>
                     </div>
-                )}
-            </div>
+
+                    {/* Stage Slider (Only if V or R) */}
+                    {(type === 'V' || type === 'R') && (
+                        <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+                            <button
+                                type="button"
+                                onClick={() => handleNumChange(-1)}
+                                className="p-3 bg-white dark:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 shadow-sm active:scale-95 transition-all border border-gray-200 dark:border-gray-700"
+                            >
+                                <Minus className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center w-24">
+                                <span className={`text-3xl font-black ${type === 'V' ? 'text-green-600' : 'text-amber-500'}`}>
+                                    {type}{stageNum}
+                                </span>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => handleNumChange(1)}
+                                className="p-3 bg-white dark:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 shadow-sm active:scale-95 transition-all border border-gray-200 dark:border-gray-700"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -168,6 +194,9 @@ export const HomeView: React.FC = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     });
+
+    // Stand Logic
+    const [isStandExpanded, setIsStandExpanded] = useState(false);
 
     // --- 4. Lot Summary Logic (Custom Hook) ---
     const summary = useLotSummary({
@@ -266,6 +295,57 @@ export const HomeView: React.FC = () => {
 
                         {/* NEW: PHENOLOGY SELECTOR */}
                         <PhenologySelector value={form.phenology} onChange={form.setPhenology} />
+
+                        {/* STAND DE PLANTAS SECTION */}
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all">
+                            <div
+                                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                                onClick={() => setIsStandExpanded(!isStandExpanded)}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors ${isStandExpanded ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                                        <Sprout className="w-4 h-4" />
+                                    </span>
+                                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Stand de Plantas</h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {form.plantsPerMeter && form.distanceBetweenRows && (
+                                        <span className="text-xs font-mono bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 px-2 py-0.5 rounded shadow-sm border border-green-200 dark:border-green-800">
+                                            {Math.round((parseFloat(form.plantsPerMeter) / parseFloat(form.distanceBetweenRows)) * 10000).toLocaleString()} pl/Ha
+                                        </span>
+                                    )}
+                                    {isStandExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                                </div>
+                            </div>
+
+                            {isStandExpanded && (
+                                <div className="p-4 pt-0 grid grid-cols-2 gap-3 animate-fade-in-down">
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Plantas / Metro</label>
+                                        <input
+                                            type="number"
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-gray-50 dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                            placeholder="0"
+                                            value={form.plantsPerMeter}
+                                            onChange={(e) => form.setPlantsPerMeter(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Distancia Hileras (m)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-gray-50 dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                            placeholder="0.52"
+                                            value={form.distanceBetweenRows}
+                                            onChange={(e) => form.setDistanceBetweenRows(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* FORM CONTROLS */}
                         <div><MultiSelect label="Plagas Detectadas" options={data.pests.sort((a, b) => a.name.localeCompare(b.name)).map(p => ({ value: p.id, label: p.name }))} selectedValues={form.selectedPestIds} onChange={form.handlePestChange} placeholder="Seleccionar plagas..." /></div>

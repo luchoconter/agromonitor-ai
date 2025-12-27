@@ -22,7 +22,7 @@ export const CropManager: React.FC<{ crops: Crop[] }> = ({ crops }) => {
 
   const openAdd = () => { setEditingItem(null); setFormData({ name: '' }); setIsModalOpen(true); };
   const openEdit = (item: Crop) => { setEditingItem(item); setFormData({ name: item.name }); setIsModalOpen(true); };
-  
+
   const handleDeleteClick = (id: string) => setDeleteId(id);
   const confirmDelete = async () => { if (deleteId) { await Storage.deleteCrop(deleteId); setDeleteId(null); } };
 
@@ -41,12 +41,12 @@ export const CropManager: React.FC<{ crops: Crop[] }> = ({ crops }) => {
       ))}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "Editar Cultivo" : "Nuevo Cultivo"}>
         <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Nombre" value={formData.name} onChange={e => setFormData({ name: e.target.value })} autoFocus required />
-            <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Guardar</Button></div>
+          <Input label="Nombre" value={formData.name} onChange={e => setFormData({ name: e.target.value })} autoFocus required />
+          <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Guardar</Button></div>
         </form>
       </Modal>
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar Cultivo">
-          <div className="space-y-4"><p className="text-gray-700 dark:text-gray-300">¿Eliminar este cultivo?</p><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleteId(null)}>Cancelar</Button><Button variant="danger" onClick={confirmDelete}>Eliminar</Button></div></div>
+        <div className="space-y-4"><p className="text-gray-700 dark:text-gray-300">¿Eliminar este cultivo?</p><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleteId(null)}>Cancelar</Button><Button variant="danger" onClick={confirmDelete}>Eliminar</Button></div></div>
       </Modal>
     </SimpleListLayout>
   );
@@ -57,7 +57,7 @@ export const TaskManager: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
   const { dataOwnerId, dataOwnerName } = useData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Task | null>(null);
-  const [formData, setFormData] = useState({ name: '' });
+  const [formData, setFormData] = useState({ name: '', price: 0 });
   const [searchTerm, setSearchTerm] = useState('');
 
   // Delete State
@@ -67,33 +67,34 @@ export const TaskManager: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     .filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const openAdd = () => { setEditingItem(null); setFormData({ name: '' }); setIsModalOpen(true); };
-  const openEdit = (item: Task) => { setEditingItem(item); setFormData({ name: item.name }); setIsModalOpen(true); };
-  
+  const openAdd = () => { setEditingItem(null); setFormData({ name: '', price: 0 }); setIsModalOpen(true); };
+  const openEdit = (item: Task) => { setEditingItem(item); setFormData({ name: item.name, price: item.pricePerHectare || 0 }); setIsModalOpen(true); };
+
   const handleDeleteClick = (id: string) => setDeleteId(id);
   const confirmDelete = async () => { if (deleteId) { await Storage.deleteTask(deleteId); setDeleteId(null); } };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !dataOwnerId) return;
-    if (editingItem) await Storage.updateTask(editingItem.id, formData.name);
-    else await Storage.addTask(formData.name, dataOwnerId, dataOwnerName);
+    if (editingItem) await Storage.updateTask(editingItem.id, formData.name, Number(formData.price));
+    else await Storage.addTask(formData.name, dataOwnerId, dataOwnerName, Number(formData.price));
     setIsModalOpen(false);
   };
 
   return (
     <SimpleListLayout title="Tareas" count={filteredItems.length} onAdd={openAdd} searchTerm={searchTerm} onSearch={setSearchTerm}>
       {filteredItems.map(item => (
-        <SimpleListItem key={item.id} name={item.name} onEdit={() => openEdit(item)} onDelete={() => handleDeleteClick(item.id)} />
+        <SimpleListItem key={item.id} name={item.name} subtitle={item.pricePerHectare ? `USD ${item.pricePerHectare}/ha` : 'Sin precio definido'} onEdit={() => openEdit(item)} onDelete={() => handleDeleteClick(item.id)} />
       ))}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "Editar Tarea" : "Nueva Tarea"}>
         <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Nombre" value={formData.name} onChange={e => setFormData({ name: e.target.value })} autoFocus required />
-            <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Guardar</Button></div>
+          <Input label="Nombre" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} autoFocus required />
+          <Input label="Precio Estimado (USD/ha)" type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) })} />
+          <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Guardar</Button></div>
         </form>
       </Modal>
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar Tarea">
-          <div className="space-y-4"><p className="text-gray-700 dark:text-gray-300">¿Eliminar esta tarea?</p><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleteId(null)}>Cancelar</Button><Button variant="danger" onClick={confirmDelete}>Eliminar</Button></div></div>
+        <div className="space-y-4"><p className="text-gray-700 dark:text-gray-300">¿Eliminar esta tarea?</p><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleteId(null)}>Cancelar</Button><Button variant="danger" onClick={confirmDelete}>Eliminar</Button></div></div>
       </Modal>
     </SimpleListLayout>
   );
@@ -113,9 +114,12 @@ const SimpleListLayout: React.FC<{ title: string; count: number; onAdd: () => vo
   </div>
 );
 
-const SimpleListItem: React.FC<{ name: string; onEdit: () => void; onDelete: () => void }> = ({ name, onEdit, onDelete }) => (
+const SimpleListItem: React.FC<{ name: string; subtitle?: string; onEdit: () => void; onDelete: () => void }> = ({ name, subtitle, onEdit, onDelete }) => (
   <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg hover:shadow-md transition-all">
-    <span className="font-semibold text-gray-800 dark:text-gray-200">{name}</span>
+    <div>
+      <span className="font-semibold text-gray-800 dark:text-gray-200 block">{name}</span>
+      {subtitle && <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">{subtitle}</span>}
+    </div>
     <div className="flex items-center gap-2">
       <button onClick={onEdit} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full"><Edit2 className="w-4 h-4" /></button>
       <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full"><Trash2 className="w-4 h-4" /></button>

@@ -142,6 +142,16 @@ export const PlotMapView: React.FC<PlotMapViewProps> = ({ plots, companies, fiel
                 opacity: isDimmed ? 0.4 : 1
             }).addTo(map);
 
+            // Add Label
+            if (!isEditing) {
+                marker.bindTooltip(`${field?.name || '?'} / ${plot.name}`, {
+                    permanent: true,
+                    direction: 'bottom',
+                    offset: [0, 12],
+                    className: 'font-bold text-xs bg-white/90 border border-gray-200 shadow-sm px-2 py-0.5 rounded text-gray-800' // using tailwind classes if leaflet supports it, otherwise plain css
+                });
+            }
+
             // Popup (Only if not editing another one)
             if (!editingPlotId) {
                 const popupContent = document.createElement('div');

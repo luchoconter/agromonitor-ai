@@ -18,11 +18,11 @@ interface BudgetSectionProps {
 const GaugeChart: React.FC<{ spent: number; committed: number; budget: number }> = ({ spent, committed, budget }) => {
     const total = spent + committed;
     const safeBudget = budget || 1;
-    
+
     // Percentages (clamped to max 100 for visual sanity in the bar, but logic handles overflow)
     const spentPct = Math.min(100, (spent / safeBudget) * 100);
     const committedPct = Math.min(100 - spentPct, (committed / safeBudget) * 100);
-    
+
     // Rotation for gauge (180 degrees)
     const rotation = -90; // Start at left
 
@@ -37,29 +37,29 @@ const GaugeChart: React.FC<{ spent: number; committed: number; budget: number }>
             <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
                 {/* Background Arc */}
                 <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#e5e7eb" strokeWidth="10" strokeLinecap="round" />
-                
+
                 {/* Committed Arc (Ghost/Projection) */}
-                <path 
-                    d="M 10 50 A 40 40 0 0 1 90 50" 
-                    fill="none" 
-                    stroke={color} 
-                    strokeWidth="10" 
+                <path
+                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="10"
                     strokeLinecap="round"
                     strokeDasharray={`${(spentPct + committedPct) * 1.26} 126`} // 126 is approx length of arc r=40
                     className="opacity-30"
                 />
 
                 {/* Spent Arc (Solid) */}
-                <path 
-                    d="M 10 50 A 40 40 0 0 1 90 50" 
-                    fill="none" 
-                    stroke={color} 
-                    strokeWidth="10" 
+                <path
+                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="10"
                     strokeLinecap="round"
                     strokeDasharray={`${spentPct * 1.26} 126`}
                 />
             </svg>
-            
+
             {/* Center Text */}
             <div className="absolute bottom-0 text-center pb-2">
                 <span className={`text-2xl font-bold ${isCritical ? 'text-red-600' : 'text-gray-800 dark:text-white'}`}>
@@ -93,7 +93,7 @@ const CategoryPie: React.FC<{ breakdown: { name: string; value: number; color: s
                             <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                     </Pie>
-                    <RechartsTooltip 
+                    <RechartsTooltip
                         formatter={(value: number) => `$${Math.round(value).toLocaleString()}`}
                         contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
@@ -123,15 +123,15 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
 
     const stats = useMemo(() => {
         let totalBudget = 0;
-        let totalExecuted = 0;   
-        let totalCommitted = 0;  
-        
-        const plotSpends: { 
-            id: string; 
-            name: string; 
-            spent: number; 
+        let totalExecuted = 0;
+        let totalCommitted = 0;
+
+        const plotSpends: {
+            id: string;
+            name: string;
+            spent: number;
             committed: number;
-            totalSpent: number; 
+            totalSpent: number;
             budget: number;
             remaining: number;
             status: 'ok' | 'warning' | 'critical';
@@ -150,31 +150,20 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
             let plotCommitted = 0;
             const categoryMap = new Map<string, number>();
 
-            const plotRecipes = prescriptions.filter(p => 
+            const plotRecipes = prescriptions.filter(p =>
                 p.status === 'active' && p.plotIds.includes(plot.id)
             );
 
-            plotRecipes.forEach(recipe => {
-                const execution = recipe.executionData?.[plot.id];
-                const isExecuted = execution?.executed;
+            // LOGIC REMOVED: Execution based on recipes is no longer valid.
+            // Future implementation will use a different source (e.g., invoices, manually entered costs).
+            // For now, we set execution/commitment to 0 to respect the "remove logic" request.
 
-                recipe.items.forEach(item => {
-                    const cost = calculateItemCost(item, plot.hectares, agrochemicals);
-                    const product = agrochemicals.find(a => a.id === item.supplyId);
-                    const type = product?.type || 'Otro';
-
-                    if (isExecuted) plotExecuted += cost;
-                    else plotCommitted += cost;
-
-                    // Breakdown
-                    categoryMap.set(type, (categoryMap.get(type) || 0) + cost);
-                });
-            });
+            // Note: plotExecuted and plotCommitted are already initialized to 0.
 
             totalExecuted += plotExecuted;
             totalCommitted += plotCommitted;
             const totalSpent = plotExecuted + plotCommitted;
-            
+
             let status: 'ok' | 'warning' | 'critical' = 'ok';
             if (plotBudget > 0) {
                 if (totalSpent > plotBudget) status = 'critical';
@@ -205,7 +194,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
         const sortedSpenders = plotSpends.sort((a, b) => {
             const pctA = a.budget > 0 ? a.totalSpent / a.budget : 0;
             const pctB = b.budget > 0 ? b.totalSpent / b.budget : 0;
-            return pctB - pctA; 
+            return pctB - pctA;
         });
 
         const topSpenders = isExporting ? sortedSpenders : sortedSpenders.slice(0, 4); // Limit to 4 cards on dashboard
@@ -266,7 +255,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                     <TrendingUp className="w-4 h-4 mr-2 text-gray-400" />
                     Lotes con Mayor Consumo
                 </h4>
-                
+
                 {stats.topSpenders.length === 0 ? (
                     <div className="p-8 text-center text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
                         No hay movimientos financieros registrados.
@@ -278,11 +267,10 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                                 {/* Header Card */}
                                 <div className="p-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 flex justify-between items-center">
                                     <span className="font-bold text-gray-800 dark:text-white truncate">{plot.name}</span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                        plot.status === 'critical' ? 'bg-red-50 text-red-600 border-red-100' :
-                                        plot.status === 'warning' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                                        'bg-green-50 text-green-600 border-green-100'
-                                    }`}>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${plot.status === 'critical' ? 'bg-red-50 text-red-600 border-red-100' :
+                                            plot.status === 'warning' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                                                'bg-green-50 text-green-600 border-green-100'
+                                        }`}>
                                         {plot.status === 'critical' ? 'CRÍTICO' : plot.status === 'warning' ? 'ALERTA' : 'OK'}
                                     </span>
                                 </div>
@@ -313,13 +301,13 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                                                 ${plot.remaining.toLocaleString()}
                                             </span>
                                         </div>
-                                        
+
                                         {/* PROJECTION WARNING */}
                                         {plot.committed > 0 && (
                                             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 flex items-start gap-1.5 text-[10px]">
                                                 <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${plot.remaining - plot.committed < 0 ? 'text-red-500' : 'text-blue-500'}`} />
                                                 <span className={`${plot.remaining - plot.committed < 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                                                    Si aplica lo pendiente, {plot.remaining - plot.committed < 0 ? 'excederá presupuesto.' : 'usará ' + Math.round(((plot.spent + plot.committed)/plot.budget)*100) + '% del total.'}
+                                                    Si aplica lo pendiente, {plot.remaining - plot.committed < 0 ? 'excederá presupuesto.' : 'usará ' + Math.round(((plot.spent + plot.committed) / plot.budget) * 100) + '% del total.'}
                                                 </span>
                                             </div>
                                         )}

@@ -21,9 +21,9 @@ export const setActiveSeason = async (seasonId: string, ownerId: string) => {
 };
 
 // PESTS
-export const addPest = async (name: string, ownerId: string, ownerName?: string, extraData?: any) => { 
+export const addPest = async (name: string, ownerId: string, ownerName?: string, extraData?: any) => {
     let imageUrl = extraData?.imageUrl;
-    
+
     // Upload image if it's a local blob
     if (imageUrl && imageUrl.startsWith('blob:')) {
         try {
@@ -31,20 +31,20 @@ export const addPest = async (name: string, ownerId: string, ownerName?: string,
             imageUrl = await uploadMedia(imageUrl, `catalog-pests/${ownerId}/${fileName}`);
         } catch (e) {
             console.warn("Pest image upload failed", e);
-            imageUrl = null; 
+            imageUrl = null;
         }
     }
 
-    await addDoc(collection(db, 'pests'), { 
-        name, 
-        ownerId, 
-        ownerName, 
+    await addDoc(collection(db, 'pests'), {
+        name,
+        ownerId,
+        ownerName,
         ...extraData,
         imageUrl: imageUrl || null
-    }); 
+    });
 };
 
-export const updatePest = async (id: string, name: string, extraData?: any) => { 
+export const updatePest = async (id: string, name: string, extraData?: any) => {
     let imageUrl = extraData?.imageUrl;
 
     // Upload image if it's a NEW local blob
@@ -63,12 +63,12 @@ export const updatePest = async (id: string, name: string, extraData?: any) => {
         updatePayload.imageUrl = imageUrl;
     }
 
-    await updateDoc(doc(db, 'pests', id), updatePayload); 
+    await updateDoc(doc(db, 'pests', id), updatePayload);
 };
 
-export const deletePest = async (id: string) => { 
+export const deletePest = async (id: string) => {
     const docRef = doc(db, 'pests', id);
-    
+
     // Clean up storage image
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -78,7 +78,7 @@ export const deletePest = async (id: string) => {
         }
     }
 
-    await deleteDoc(docRef); 
+    await deleteDoc(docRef);
 };
 
 // CROPS
@@ -92,6 +92,6 @@ export const updateAgrochemical = async (id: string, name: string, extraData?: a
 export const deleteAgrochemical = async (id: string) => { await deleteDoc(doc(db, 'agrochemicals', id)); };
 
 // TASKS
-export const addTask = async (name: string, ownerId: string, ownerName?: string) => { await addDoc(collection(db, 'tasks'), { name, ownerId, ownerName }); };
-export const updateTask = async (id: string, name: string) => { await updateDoc(doc(db, 'tasks', id), { name }); };
+export const addTask = async (name: string, ownerId: string, ownerName?: string, pricePerHectare?: number) => { await addDoc(collection(db, 'tasks'), { name, ownerId, ownerName, pricePerHectare: pricePerHectare || 0 }); };
+export const updateTask = async (id: string, name: string, pricePerHectare?: number) => { await updateDoc(doc(db, 'tasks', id), { name, pricePerHectare: pricePerHectare || 0 }); };
 export const deleteTask = async (id: string) => { await deleteDoc(doc(db, 'tasks', id)); };

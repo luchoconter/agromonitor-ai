@@ -2,8 +2,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
-import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send } from 'lucide-react';
+import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History } from 'lucide-react';
 import { LotSummary } from '../types';
+import { TrackSession } from '../types/tracking';
 import { Button, Modal, Select } from '../components/UI';
 import * as Storage from '../services/storageService';
 import * as AI from '../services/geminiService';
@@ -23,6 +24,7 @@ import { MapSection } from '../components/dashboard/MapSection';
 import { WeatherWidget } from '../components/weather/WeatherWidget';
 import { LotSituationTable } from '../components/dashboard/LotSituationTable';
 import { LotHistoryModal } from '../components/dashboard/LotHistoryModal';
+import { LotStatusModal } from '../components/dashboard/LotStatusModal';
 import { BudgetSection } from '../components/dashboard/BudgetSection';
 import { HeatmapSection } from '../components/dashboard/HeatmapSection';
 
@@ -49,9 +51,10 @@ export const DashboardView: React.FC = () => {
 
     const [visualMode, setVisualMode] = useState<'list' | 'map' | 'charts'>('list');
 
-    const [mapColorMode, setMapColorMode] = useState<'date' | 'status' | 'pest'>('date');
+    const [mapColorMode, setMapColorMode] = useState<'date' | 'status' | 'pest' | 'track'>('date');
     const [showMapHistory, setShowMapHistory] = useState(false);
     const [selectedMapPest, setSelectedMapPest] = useState<string>('');
+    const [selectedTrackUser, setSelectedTrackUser] = useState<string>('');
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -59,6 +62,9 @@ export const DashboardView: React.FC = () => {
 
     const [showAiModal, setShowAiModal] = useState(false);
     const [editableReport, setEditableReport] = useState('');
+
+    // Sorting State
+    const [sortConfig, setSortConfig] = useState<{ key: 'date' | 'status' | 'name', direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     const [feedbackItem, setFeedbackItem] = useState<LotSummary | null>(null);
@@ -69,6 +75,9 @@ export const DashboardView: React.FC = () => {
 
     // NEW: History Modal State
     const [historyPlotId, setHistoryPlotId] = useState<string | null>(null);
+
+    // NEW: Tracks State
+    const [tracks, setTracks] = useState<TrackSession[]>([]);
 
     const { isRecording, audioBlobUrl, audioDuration, toggleRecording, resetRecording } = useMediaRecorder();
 
@@ -131,6 +140,31 @@ export const DashboardView: React.FC = () => {
         }
     }, [availableCropsForFilter, selectedCropId]);
 
+    // --- FETCH TRACKS ---
+    useEffect(() => {
+        if (!effectiveCompanyId) return;
+
+        const loadTracks = async () => {
+            // If dates are empty, default to last 30 days or handle in repo logic?
+            // Repo logic handles undefined dates by not filtering.
+            // We might want to construct dates if dateFrom/dateTo are valid strings
+            const dFrom = dateFrom ? new Date(dateFrom) : undefined;
+            const dTo = dateTo ? new Date(dateTo) : undefined;
+
+            // If dTo, set to end of day
+            if (dTo) dTo.setHours(23, 59, 59, 999);
+
+            try {
+                const fetched = await Storage.getTracks(effectiveCompanyId, undefined, dFrom, dTo);
+                setTracks(fetched);
+            } catch (err) {
+                console.error("Error loading tracks", err);
+            }
+        };
+
+        loadTracks();
+    }, [effectiveCompanyId, dateFrom, dateTo]);
+
     // --- WEATHER LOCATION INFERENCE (ROBUST) ---
     const weatherLocation = useMemo(() => {
         const targetFieldId = selectedFieldId;
@@ -154,8 +188,27 @@ export const DashboardView: React.FC = () => {
                 name: fieldName || 'Campo'
             };
         }
+
+        // Fallback: Try to find ANY plot with coordinates in the context
+        if (targetFieldId) {
+            const plotWithLoc = data.plots.find(p => p.fieldId === targetFieldId && p.lat && p.lng);
+            if (plotWithLoc && plotWithLoc.lat && plotWithLoc.lng) {
+                const fieldName = data.fields.find(f => f.id === targetFieldId)?.name;
+                return { lat: plotWithLoc.lat, lng: plotWithLoc.lng, name: fieldName || 'Campo' };
+            }
+        }
+
+        if (targetCompanyId) {
+            // Find any plot in company
+            const plotWithLoc = data.plots.find(p => p.companyId === targetCompanyId && p.lat && p.lng);
+            if (plotWithLoc && plotWithLoc.lat && plotWithLoc.lng) {
+                const field = data.fields.find(f => f.id === plotWithLoc.fieldId);
+                return { lat: plotWithLoc.lat, lng: plotWithLoc.lng, name: field ? field.name : 'Campo' };
+            }
+        }
+
         return null;
-    }, [data.monitorings, selectedFieldId, effectiveCompanyId, data.fields]);
+    }, [data.monitorings, selectedFieldId, effectiveCompanyId, data.fields, data.plots]);
 
     const availableFields = useMemo(() => data.fields.filter(f => f.companyId === effectiveCompanyId), [data.fields, effectiveCompanyId]);
 
@@ -202,6 +255,22 @@ export const DashboardView: React.FC = () => {
         }
     }, [mapColorMode, availablePestsForMap, selectedMapPest]);
 
+    // Available Track Users
+    const availableTrackUsers = useMemo(() => {
+        const users = new Set<string>();
+        tracks.forEach(t => {
+            if (t.userName) users.add(t.userName);
+        });
+        return Array.from(users).sort();
+    }, [tracks]);
+
+    // Default select first user if tracks exist and no user selected
+    useEffect(() => {
+        if (mapColorMode === 'track' && !selectedTrackUser && availableTrackUsers.length > 0) {
+            setSelectedTrackUser(availableTrackUsers[0]);
+        }
+    }, [mapColorMode, availableTrackUsers, selectedTrackUser]);
+
 
     // FILTER SUMMARIES (For KPIs and Export)
     const filteredSummariesBase = useMemo(() => {
@@ -239,6 +308,79 @@ export const DashboardView: React.FC = () => {
             return true;
         });
     }, [data.plots, data.fields, effectiveCompanyId, selectedFieldId, selectedCropId, searchTerm, selectedSeasonId, data.assignments]);
+
+    // --- SORTING LOGIC ---
+    // 1. Pre-calculate latest summary for each plot to avoid O(N^2) in sort
+    const latestSummariesMap = useMemo(() => {
+        const map = new Map<string, LotSummary>();
+        filteredPlotsForTable.forEach(plot => {
+            const plotSummaries = filteredSummaries.filter(s => s.plotId === plot.id);
+            if (plotSummaries.length > 0) {
+                // Find latest
+                const latest = plotSummaries.reduce((prev, current) =>
+                    (new Date(prev.date) > new Date(current.date)) ? prev : current
+                );
+                map.set(plot.id, latest);
+            }
+        });
+        return map;
+    }, [filteredPlotsForTable, filteredSummaries]);
+
+    // 2. Sort Plots
+    const sortedPlots = useMemo(() => {
+        const sorted = [...filteredPlotsForTable];
+
+        sorted.sort((a, b) => {
+            const summaryA = latestSummariesMap.get(a.id);
+            const summaryB = latestSummariesMap.get(b.id);
+
+            // Helper for sorting by status severity
+            const getSeverity = (s?: LotSummary) => {
+                if (!s) return 0;
+                const status = s.engineerStatus || s.status;
+                if (status === 'rojo') return 3;
+                if (status === 'amarillo') return 2;
+                if (status === 'verde') return 1;
+                return 0; // Grey/None
+            };
+
+            if (sortConfig.key === 'status') {
+                const sevA = getSeverity(summaryA);
+                const sevB = getSeverity(summaryB);
+                if (sevA !== sevB) {
+                    return sortConfig.direction === 'desc' ? sevB - sevA : sevA - sevB;
+                }
+                // Fallback to name if status matches
+                return a.name.localeCompare(b.name);
+            }
+
+            if (sortConfig.key === 'date') {
+                const dateA = summaryA ? new Date(summaryA.date).getTime() : 0;
+                const dateB = summaryB ? new Date(summaryB.date).getTime() : 0;
+                if (dateA !== dateB) {
+                    return sortConfig.direction === 'desc' ? dateB - dateA : dateA - dateB;
+                }
+                return a.name.localeCompare(b.name);
+            }
+
+            if (sortConfig.key === 'name') {
+                return sortConfig.direction === 'asc'
+                    ? a.name.localeCompare(b.name)
+                    : b.name.localeCompare(a.name);
+            }
+
+            return 0;
+        });
+
+        return sorted;
+    }, [filteredPlotsForTable, latestSummariesMap, sortConfig]);
+
+    const handleSort = (key: 'date' | 'status' | 'name') => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
 
     // --- TIME SERIES GENERATION ---
     const healthHistoryData = useMemo(() => {
@@ -756,18 +898,26 @@ export const DashboardView: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                         <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg">
                             <button onClick={() => setMapColorMode('date')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${mapColorMode === 'date' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-                                <Calendar className="w-3 h-3 mr-1.5" /> Recorrida
+                                <Calendar className="w-3 h-3 mr-1.5" /> Puntos
                             </button>
                             <button onClick={() => setMapColorMode('status')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${mapColorMode === 'status' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-                                <Layers className="w-3 h-3 mr-1.5" /> Estado
+                                <Layers className="w-3 h-3 mr-1.5" /> Semáforo
                             </button>
                             <button onClick={() => setMapColorMode('pest')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${mapColorMode === 'pest' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
                                 <Bug className="w-3 h-3 mr-1.5" /> Plaga
+                            </button>
+                            <button onClick={() => setMapColorMode('track')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${mapColorMode === 'track' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                                <History className="w-3 h-3 mr-1.5" /> Recorrido
                             </button>
                         </div>
                         {mapColorMode === 'pest' && (
                             <div className="w-full md:w-48">
                                 <Select label="" options={availablePestsForMap.map(p => ({ value: p, label: p }))} value={selectedMapPest} onChange={(e) => setSelectedMapPest(e.target.value)} placeholder="Seleccionar plaga..." className="text-xs h-9 py-1" />
+                            </div>
+                        )}
+                        {mapColorMode === 'track' && (
+                            <div className="w-full md:w-48">
+                                <Select label="" options={availableTrackUsers.map(u => ({ value: u, label: u }))} value={selectedTrackUser} onChange={(e) => setSelectedTrackUser(e.target.value)} placeholder="Seleccionar usuario..." className="text-xs h-9 py-1" />
                             </div>
                         )}
                     </div>
@@ -847,6 +997,12 @@ export const DashboardView: React.FC = () => {
                     isExporting={isExporting}
                     onSelectSummary={setSelectedSummary}
                     showHistory={showMapHistory}
+                    assignments={data.assignments}
+                    crops={data.crops}
+                    seasonId={selectedSeasonId}
+                    tracks={mapColorMode === 'track' && selectedTrackUser ? tracks.filter(t => t.userName === selectedTrackUser) : (mapColorMode === 'track' ? tracks : [])}
+                    fields={data.fields}
+                    onOpenHistory={setHistoryPlotId}
                 />
             </div>
 
@@ -862,7 +1018,7 @@ export const DashboardView: React.FC = () => {
                 <div className="overflow-hidden">
                     <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2 px-1">Situación de Lotes</h3>
                     <LotSituationTable
-                        plots={filteredPlotsForTable}
+                        plots={sortedPlots}
                         summaries={filteredSummaries}
                         prescriptions={data.prescriptions}
                         data={data}
@@ -871,53 +1027,19 @@ export const DashboardView: React.FC = () => {
                         currentUser={currentUser}
                         onOpenHistory={setHistoryPlotId}
                         seasonId={selectedSeasonId}
+                        sortConfig={sortConfig}
+                        onSort={handleSort}
                     />
                 </div>
             </div>
 
-            <Modal isOpen={!!selectedSummary} onClose={() => setSelectedSummary(null)} title="Detalle de Estado">
-                {selectedSummary && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-start bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-                            <div>
-                                <h4 className="font-bold text-gray-900 dark:text-white text-lg">
-                                    {data.plots.find(p => p.id === selectedSummary.plotId)?.name}
-                                </h4>
-                                <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                                    <MapIcon className="w-3 h-3" />
-                                    {data.fields.find(f => f.id === selectedSummary.fieldId)?.name}
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="flex items-center text-xs font-mono text-gray-600 dark:text-gray-400">
-                                    <Calendar className="w-3 h-3 mr-1" />
-                                    {new Date(selectedSummary.date).toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className={`p-3 rounded-lg text-center font-bold uppercase text-sm border ${(selectedSummary.engineerStatus || selectedSummary.status) === 'verde' ? 'bg-green-100 text-green-700 border-green-200' :
-                            (selectedSummary.engineerStatus || selectedSummary.status) === 'amarillo' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                'bg-red-100 text-red-700 border-red-200'
-                            }`}>
-                            Estado: {selectedSummary.engineerStatus || selectedSummary.status}
-                        </div>
-
-                        {selectedSummary.notes && (
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Nota</label>
-                                <p className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-sm text-gray-700 dark:text-gray-300 italic border border-gray-200 dark:border-gray-700">
-                                    "{selectedSummary.notes}"
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="flex justify-end pt-2">
-                            <Button variant="ghost" onClick={() => setSelectedSummary(null)}>Cerrar</Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+            <LotStatusModal
+                isOpen={!!selectedSummary}
+                onClose={() => setSelectedSummary(null)}
+                summary={selectedSummary}
+                data={data}
+                currentUser={currentUser}
+            />
 
             <Modal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} title="Revisión Técnica">
                 <div className="space-y-4">
