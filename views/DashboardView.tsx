@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
-import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History } from 'lucide-react';
+import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History, Cloud, ChevronDown, ChevronUp } from 'lucide-react';
 import { LotSummary } from '../types';
 import { TrackSession } from '../types/tracking';
 import { Button, Modal, Select } from '../components/UI';
@@ -44,6 +44,7 @@ export const DashboardView: React.FC = () => {
     const [selectedCropId, setSelectedCropId] = useState<string>('');
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [isWeatherExpanded, setIsWeatherExpanded] = useState(false);
 
     // Date Range Filters
     const [dateFrom, setDateFrom] = useState('');
@@ -886,11 +887,26 @@ export const DashboardView: React.FC = () => {
 
             {weatherLocation && (
                 <div className="mb-4 animate-fade-in">
-                    <WeatherWidget
-                        lat={weatherLocation.lat}
-                        lng={weatherLocation.lng}
-                        locationName={weatherLocation.name}
-                    />
+                    <button
+                        onClick={() => setIsWeatherExpanded(!isWeatherExpanded)}
+                        className="w-full flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium">
+                            <Cloud className="w-5 h-5 text-blue-500" />
+                            <span>Pronóstico del Clima ({weatherLocation.name})</span>
+                        </div>
+                        {isWeatherExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+
+                    {isWeatherExpanded && (
+                        <div className="mt-2 animate-fade-in-down">
+                            <WeatherWidget
+                                lat={weatherLocation.lat}
+                                lng={weatherLocation.lng}
+                                locationName={weatherLocation.name}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 

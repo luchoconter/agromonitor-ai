@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings, ClipboardList, History, BarChart3, Users, LayoutList, Layers, Wheat, Bug, Sprout, Menu, X, LogOut, Sun, Moon, FlaskConical, ListTodo, FileText, Calendar, CloudOff, Cloud, RefreshCw, CheckCircle, AlertCircle, Loader2, Circle, StopCircle, Play, Save, Trash2, Wallet
+  Settings, ClipboardList, History, BarChart3, Users, LayoutList, Layers, Wheat, Bug, Sprout, Menu, X, LogOut, Sun, Moon, FlaskConical, ListTodo, FileText, Calendar, CloudOff, Cloud, RefreshCw, CheckCircle, AlertCircle, Loader2, Circle, StopCircle, Play, Save, Trash2, Wallet, Download
 } from 'lucide-react';
 import { ViewState } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,6 +31,33 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [showStopModal, setShowStopModal] = useState(false);
   // New: Start Modal State
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+
+  // New: PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      // Prevent browser default
+      e.preventDefault();
+      // Store event
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // Monitor connection status and pending operations
   useEffect(() => {
@@ -272,6 +299,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="flex flex-col"><span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate w-32">{currentUser.name}</span><span className="text-[10px] text-gray-500 dark:text-blue-300 capitalize">{currentUser.role}</span></div>
               </div>
               <button onClick={logout} className="w-full flex items-center justify-center px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"><LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión</button>
+
+              {/* Mobile Install Button */}
+              {deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full flex items-center justify-center px-4 py-2 mt-2 bg-agro-600 text-white rounded-lg hover:bg-agro-700 transition-colors text-sm font-medium"
+                >
+                  <Download className="w-4 h-4 mr-2" /> Instalar Aplicación
+                </button>
+              )}
             </div>
           </aside>
         </div>
@@ -399,6 +436,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button onClick={toggleTheme} className="p-2 rounded-full text-gray-500 dark:text-blue-300 hover:bg-gray-100 dark:hover:bg-gray-700">{isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}</button>
             <div className="hidden md:flex items-center space-x-3 border-l pl-6 border-gray-200 dark:border-gray-700">
               <div className="flex flex-col items-end mr-1"><span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{currentUser.name}</span><span className="text-xs text-gray-500 dark:text-blue-300 capitalize">{currentUser.role}</span></div>
+
+              {/* Desktop Install Button */}
+              {deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  className="p-2 text-agro-600 hover:bg-agro-50 dark:text-agro-400 dark:hover:bg-agro-900/20 rounded-lg transition-colors"
+                  title="Instalar Aplicación"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+              )}
+
               <button onClick={logout} className="p-2 text-gray-500 hover:text-red-500 dark:text-blue-300 transition-colors"><LogOut className="w-5 h-5" /></button>
             </div>
           </div>
