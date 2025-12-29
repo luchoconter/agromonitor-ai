@@ -10,6 +10,8 @@ import { syncPendingOperations } from '../services/autoSyncService';
 import { useTracking } from '../contexts/TrackingContext';
 import { Modal } from './UI'; // Ensure Modal is imported if it exists, otherwise use custom div
 
+import { TrackingStartModal } from './tracking/TrackingStartModal';
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -27,6 +29,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // New: Stop Modal State
   const [showStopModal, setShowStopModal] = useState(false);
+  // New: Start Modal State
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
 
   // Monitor connection status and pending operations
   useEffect(() => {
@@ -206,6 +210,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-gray-900 overflow-hidden font-sans text-gray-800 dark:text-gray-100 relative">
+      {/* START TRACKING MODAL */}
+      <TrackingStartModal
+        isOpen={isTrackingModalOpen}
+        onClose={() => setIsTrackingModalOpen(false)}
+        onStart={(cid, fids) => {
+          startTracking(cid, fids);
+          setIsTrackingModalOpen(false);
+        }}
+      />
+
       {/* STOP TRACKING MODAL */}
       {showStopModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -287,7 +301,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 ) : (
                   <button
-                    onClick={startTracking}
+                    onClick={() => setIsTrackingModalOpen(true)}
                     className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     title="Iniciar Recorrido"
                   >

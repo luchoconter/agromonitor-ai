@@ -16,7 +16,7 @@ interface TrackingContextType {
     isPaused: boolean;
     currentTrack: TrackSession | null;
     elapsedTime: number; // in seconds
-    startTracking: () => Promise<void>;
+    startTracking: (companyId?: string, fieldIds?: string[]) => Promise<void>;
     pauseTracking: () => Promise<void>;
     resumeTracking: () => Promise<void>;
     finishTracking: (save: boolean) => Promise<void>;
@@ -58,7 +58,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         };
     }, [isTracking, isPaused]);
 
-    const startTracking = async () => {
+    const startTracking = async (companyId?: string, fieldIds?: string[]) => {
         if (!currentUser) return;
 
         // Security Check: Only admins and operators can track
@@ -85,7 +85,10 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
             startTime: new Date().toISOString(),
             points: [],
             distance: 0,
-            status: 'recording'
+            status: 'recording',
+            companyId,
+            fieldIds,
+            synced: false
         };
 
         setCurrentTrack(newTrack);
@@ -116,24 +119,36 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                     heading
                 };
 
-                setCurrentTrack(prev => {
-                    if (!prev) return null;
-                    return { ...prev, points: [...prev.points, newPoint] };
-                });
+                // OPTIMIZATION: Smart Distance Filter (10 meters) causes less points to be stored
+                // while maintaining map quality.
+                let shouldSave = false;
+                let dist = 0;
 
-                if (lastPointRef.current) {
-                    const dist = calculateDistance(
+                if (!lastPointRef.current) {
+                    shouldSave = true;
+                } else {
+                    dist = calculateDistance(
                         lastPointRef.current.lat,
                         lastPointRef.current.lng,
                         latitude,
                         longitude
                     );
-                    // Minimal movement filter (e.g. 5 meters) to accumulate distance
-                    if (dist > 0.005) {
-                        setDistanceTraveled(prev => prev + dist);
+                    if (dist > 0.010) { // 10 meters min distance
+                        shouldSave = true;
                     }
                 }
-                lastPointRef.current = newPoint;
+
+                if (shouldSave) {
+                    setCurrentTrack(prev => {
+                        if (!prev) return null;
+                        return { ...prev, points: [...prev.points, newPoint] };
+                    });
+
+                    if (lastPointRef.current) {
+                        setDistanceTraveled(prev => prev + dist);
+                    }
+                    lastPointRef.current = newPoint;
+                }
             },
             (err) => {
                 console.error(err);
@@ -177,8 +192,27 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                 status: 'completed',
                 distance: distanceTraveled
             };
+
             try {
-                await saveTrack(finalTrack);
+                // 1. Save Offline FIRST (Critical for reliability)
+                const { saveTrackOffline, markTrackSynced } = await import('../services/offlineTrackService');
+                await saveTrackOffline(finalTrack);
+
+                // 2. Try Sync
+                if (navigator.onLine) {
+                    try {
+                        await saveTrack(finalTrack);
+                        await markTrackSynced(finalTrack.id);
+                        finalTrack.status = 'synced';
+                        finalTrack.synced = true;
+                    } catch (syncErr) {
+                        console.warn("Sync failed, track saved offline", syncErr);
+                        // No error shown to user, it's safe offline
+                    }
+                } else {
+                    console.log("Offline mode: Track saved locally.");
+                }
+
             } catch (e) {
                 console.error("Error saving track", e);
                 setError("Error al guardar el recorrido.");

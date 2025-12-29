@@ -145,16 +145,22 @@ export const DashboardView: React.FC = () => {
         if (!effectiveCompanyId) return;
 
         const loadTracks = async () => {
-            // If dates are empty, default to last 30 days or handle in repo logic?
-            // Repo logic handles undefined dates by not filtering.
-            // We might want to construct dates if dateFrom/dateTo are valid strings
-            const dFrom = dateFrom ? new Date(dateFrom) : undefined;
-            const dTo = dateTo ? new Date(dateTo) : undefined;
+            // Default to last 7 days if no date selected
+            let dFrom = dateFrom ? new Date(dateFrom) : new Date();
+            let dTo = dateTo ? new Date(dateTo) : new Date();
 
-            // If dTo, set to end of day
-            if (dTo) dTo.setHours(23, 59, 59, 999);
+            if (!dateFrom) {
+                // If no "From" date, default to 7 days ago
+                dFrom.setDate(dFrom.getDate() - 7);
+                dFrom.setHours(0, 0, 0, 0);
+            }
+
+            // Limit "To" date to end of day
+            dTo.setHours(23, 59, 59, 999);
 
             try {
+                // If historic mode is OFF (implied by !dateFrom check originally?), user wants default view
+                // But if they use the date pickers (historic mode), we respect them.
                 const fetched = await Storage.getTracks(effectiveCompanyId, undefined, dFrom, dTo);
                 setTracks(fetched);
             } catch (err) {
@@ -164,6 +170,11 @@ export const DashboardView: React.FC = () => {
 
         loadTracks();
     }, [effectiveCompanyId, dateFrom, dateTo]);
+
+    const filteredTracksForMap = useMemo(() => {
+        if (!selectedTrackUser || selectedTrackUser === 'all') return tracks;
+        return tracks.filter(t => t.userName === selectedTrackUser);
+    }, [tracks, selectedTrackUser]);
 
     // --- WEATHER LOCATION INFERENCE (ROBUST) ---
     const weatherLocation = useMemo(() => {
@@ -265,11 +276,12 @@ export const DashboardView: React.FC = () => {
     }, [tracks]);
 
     // Default select first user if tracks exist and no user selected
+    // Default select ALL if tracks exist and no user selected
     useEffect(() => {
-        if (mapColorMode === 'track' && !selectedTrackUser && availableTrackUsers.length > 0) {
-            setSelectedTrackUser(availableTrackUsers[0]);
+        if (mapColorMode === 'track' && !selectedTrackUser) {
+            setSelectedTrackUser('all');
         }
-    }, [mapColorMode, availableTrackUsers, selectedTrackUser]);
+    }, [mapColorMode, selectedTrackUser]);
 
 
     // FILTER SUMMARIES (For KPIs and Export)
@@ -919,7 +931,17 @@ export const DashboardView: React.FC = () => {
                         )}
                         {mapColorMode === 'track' && (
                             <div className="w-full md:w-48">
-                                <Select label="" options={availableTrackUsers.map(u => ({ value: u, label: u }))} value={selectedTrackUser} onChange={(e) => setSelectedTrackUser(e.target.value)} placeholder="Seleccionar usuario..." className="text-xs h-9 py-1" />
+                                <Select
+                                    label=""
+                                    options={[
+                                        { value: 'all', label: 'Todos los usuarios' },
+                                        ...availableTrackUsers.map(u => ({ value: u, label: u }))
+                                    ]}
+                                    value={selectedTrackUser}
+                                    onChange={(e) => setSelectedTrackUser(e.target.value)}
+                                    placeholder="Usuario..."
+                                    className="text-xs h-9 py-1"
+                                />
                             </div>
                         )}
                     </div>
@@ -1000,7 +1022,7 @@ export const DashboardView: React.FC = () => {
                     isExporting={isExporting}
                     // onSelectSummary={setSelectedSummary} // Disable auto select for now during map view?
                     showHistory={showMapHistory}
-                    tracks={tracks}
+                    tracks={filteredTracksForMap}
                     onOpenHistory={(pid) => {
                         setHistoryPlotId(pid);
                     }}

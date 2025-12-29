@@ -502,20 +502,47 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
 
         // --- TRACKS RENDERING ---
         if (tracks.length > 0) {
+            const trackMarkers: any[] = [];
+
+            // Color palette for days
+            const TRACK_COLORS = ['#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#10b981', '#ec4899', '#6366f1'];
+
+            // Group tracks by date to assign colors
+            const uniqueDates = Array.from(new Set(tracks.map(t => new Date(t.startTime).toLocaleDateString()))).sort();
+
             tracks.forEach(track => {
                 if (!track.points || track.points.length === 0) return;
+
+                const trackDate = new Date(track.startTime).toLocaleDateString();
+                const colorIndex = uniqueDates.indexOf(trackDate) % TRACK_COLORS.length;
+                const trackColor = TRACK_COLORS[colorIndex];
 
                 // 1. Draw Polyline
                 const latlngs = track.points.map(p => [p.lat, p.lng] as [number, number]);
                 const polyline = L.polyline(latlngs, {
-                    color: '#8b5cf6', // Violeta
-                    weight: 4,
-                    opacity: 0.7,
-                    dashArray: '10, 10'
+                    color: trackColor,
+                    weight: 5,
+                    opacity: 0.8,
+                    lineJoin: 'round'
                 }).addTo(map);
 
-                polyline.bindPopup(`<b>Recorrido: ${track.userName}</b><br/>${getShortDate(track.startTime)}<br/>Distancia: ${track.distance.toFixed(2)} km`);
-                markers.push(polyline); // Add to markers to fit bounds if needed
+                polyline.bindPopup(`
+                    <div class="text-xs">
+                        <strong class="text-sm block mb-1">${track.userName}</strong>
+                        <div class="mb-1">${getShortDate(track.startTime)} <span class="text-gray-400">|</span> ${new Date(track.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div>Distancia: <b>${track.distance.toFixed(2)} km</b></div>
+                        ${track.fieldIds && track.fieldIds.length > 0 ? `<div class="mt-1 text-gray-500 italic">Campos: ${track.fieldIds.length}</div>` : ''}
+                    </div>
+                `);
+
+                trackMarkers.push(polyline); // Add to local array for bounds calculation
+
+                // Add start/end markers
+                const startPoint = latlngs[0];
+                const endPoint = latlngs[latlngs.length - 1];
+
+                L.circleMarker(startPoint, { radius: 4, color: '#10b981', fillOpacity: 1 }).addTo(map);
+                L.circleMarker(endPoint, { radius: 4, color: '#ef4444', fillOpacity: 1 }).addTo(map);
 
                 // 2. Stop Detection Algorithm (> 1 min in 30m radius)
                 const STOPS_THRESHOLD_KM = 0.03; // 30 meters
@@ -539,51 +566,35 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                             // Add STOP Marker
                             const markerHtml = `
                                 <div style="background-color: #ef4444; color: white; border-radius: 4px; padding: 2px 4px; font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap;">
-                                    STOP ${Math.round(durationMins)}m
+                                    ${Math.round(durationMins)}m
                                 </div>
                             `;
                             const customIcon = L.divIcon({
                                 className: 'custom-stop-marker',
                                 html: markerHtml,
-                                iconSize: [60, 20],
-                                iconAnchor: [30, 25] // Offset above
+                                iconSize: [40, 20],
+                                iconAnchor: [20, 25] // Offset above
                             });
 
                             const stopMarker = L.marker([pStart.lat, pStart.lng], { icon: customIcon, zIndexOffset: 1000 })
                                 .addTo(map)
                                 .bindPopup(`<b>Parada: ${Math.round(durationMins)} min</b><br/>Hora: ${new Date(startTime).toLocaleTimeString()}`);
 
-                            markers.push(stopMarker);
+                            trackMarkers.push(stopMarker);
                         }
                         groupStartIdx = i;
                     }
                 }
-
-                // Check last group
-                const lastIdx = track.points.length - 1;
-                const lastStartTime = track.points[groupStartIdx].timestamp;
-                const lastEndTime = track.points[lastIdx].timestamp;
-                const lastDuration = (lastEndTime - lastStartTime) / 1000 / 60;
-
-                if (lastDuration >= STOP_MIN_MINUTES) {
-                    const pStart = track.points[groupStartIdx];
-                    const markerHtml = `
-                        <div style="background-color: #ef4444; color: white; border-radius: 4px; padding: 2px 4px; font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap;">
-                            STOP ${Math.round(lastDuration)}m
-                        </div>
-                    `;
-                    const customIcon = L.divIcon({
-                        className: 'custom-stop-marker',
-                        html: markerHtml,
-                        iconSize: [60, 20],
-                        iconAnchor: [30, 25]
-                    });
-                    const stopMarker = L.marker([pStart.lat, pStart.lng], { icon: customIcon, zIndexOffset: 1000 })
-                        .addTo(map)
-                        .bindPopup(`<b>Parada: ${Math.round(lastDuration)} min</b><br/>Hora: ${new Date(lastStartTime).toLocaleTimeString()}`);
-                    markers.push(stopMarker);
-                }
             });
+
+            // Auto-zoom to tracks if they exist
+            if (trackMarkers.length > 0) {
+                const group = L.featureGroup(trackMarkers);
+                const bounds = group.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
         }
 
     }, [monitorings, plots, mapColorMode, summaries, isExporting, selectedPestForMap, pestAnalytics, activeFilter, mapType, onSelectSummary, showHistory, isMaximized, tracks]);

@@ -16,4 +16,7 @@ export interface TrackSession {
     points: TrackPoint[];
     distance: number; // in kilometers
     status: 'recording' | 'completed' | 'synced'; // recording: in memory/local, completed: finished but not uploaded, synced: in firestore
+    companyId?: string;
+    fieldIds?: string[];
+    synced?: boolean;
 }
