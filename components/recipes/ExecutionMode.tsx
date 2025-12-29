@@ -9,7 +9,7 @@ import {
     AlertTriangle, ShoppingCart, Info, MapPin, Clock
 } from 'lucide-react';
 import * as Storage from '../../services/storageService';
-import { Prescription, PrescriptionExecution, ExecutionItem } from '../../types';
+import { Prescription, PrescriptionExecution, ExecutionItem, PrescriptionItem } from '../../types';
 
 interface ExecutionModeProps {
     onBack: () => void;
@@ -227,54 +227,131 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                         const isexecuted = recipe.executionData?.[pid]?.executed;
                                         const executionDetails = recipe.executionData?.[pid];
 
+                                        // --- DIFFERENCE CALCULATION ---
+                                        const differences: string[] = [];
+                                        if (isexecuted && executionDetails) {
+                                            // 1. Hectares Comparison
+                                            const prescribedHa = recipe.plotMetadata?.[pid]?.affectedHectares ?? (data.plots.find(p => p.id === pid)?.hectares || 0);
+                                            const actualHa = executionDetails.actualHectares || 0;
+                                            if (Math.abs(prescribedHa - actualHa) > 0.1) {
+                                                differences.push(`Sup: ${prescribedHa}ha ➔ ${actualHa}ha`);
+                                            }
+
+                                            // 2. Items Comparison
+                                            const prescribedItemsMap = new Map<string, PrescriptionItem>(recipe.items.map(i => [i.supplyId, i]));
+                                            const actualItemsMap = new Map<string, ExecutionItem>((executionDetails.actualItems || []).map(i => [i.supplyId, i]));
+
+                                            // Check missing or modified
+                                            prescribedItemsMap.forEach((pItem, supplyId) => {
+                                                const aItem = actualItemsMap.get(supplyId);
+                                                if (!aItem) {
+                                                    differences.push(`No aplicado: ${pItem.supplyName}`);
+                                                } else {
+                                                    const pDose = parseFloat(pItem.dose.toString().replace(',', '.'));
+                                                    if (Math.abs(pDose - aItem.dose) > 0.001) {
+                                                        const pUnit = pItem.unit.split('/')[0] || pItem.unit; // Clean unit for display
+                                                        differences.push(`${pItem.supplyName}: ${pDose} ➔ ${aItem.dose} ${aItem.unit}`);
+                                                    }
+                                                }
+                                            });
+
+                                            // Check added
+                                            actualItemsMap.forEach((aItem, supplyId) => {
+                                                if (!prescribedItemsMap.has(supplyId)) {
+                                                    differences.push(`Extra: ${aItem.supplyName} (${aItem.dose} ${aItem.unit})`);
+                                                }
+                                            });
+
+                                            // 3. Tasks Comparison
+                                            const prescribedTasks = new Set(recipe.taskIds);
+                                            const actualTasks = new Set(executionDetails.actualTasks || []);
+
+                                            // Missing tasks
+                                            prescribedTasks.forEach(tid => {
+                                                if (!actualTasks.has(tid)) {
+                                                    const tName = recipe.taskNames[recipe.taskIds.indexOf(tid)] || 'Labor';
+                                                    differences.push(`No realizada: ${tName}`);
+                                                }
+                                            });
+
+                                            // Extra tasks
+                                            actualTasks.forEach(tid => {
+                                                if (!prescribedTasks.has(tid)) {
+                                                    const tName = data.tasks.find(t => t.id === tid)?.name || 'Labor Extra';
+                                                    differences.push(`Extra: ${tName}`);
+                                                }
+                                            });
+                                        }
+
                                         return (
-                                            <div key={pid} className={`flex justify-between items-start p-3 rounded-lg border transition-colors ${isexecuted ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900/50' : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 items-center'}`}>
-                                                <div>
-                                                    <span className={`block font-medium text-sm ${isexecuted ? 'text-green-800 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>{pName}</span>
-                                                    {recipe.plotMetadata?.[pid]?.observation && (
-                                                        <span className="text-[10px] text-gray-500 italic block">"{recipe.plotMetadata[pid].observation}"</span>
-                                                    )}
-                                                    {recipe.plotMetadata?.[pid]?.affectedHectares && (
-                                                        <span className="text-[10px] text-blue-600 block">{recipe.plotMetadata[pid].affectedHectares} ha</span>
+                                            <div key={pid} className={`flex flex-col p-3 rounded-lg border transition-colors ${isexecuted ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900/50' : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'}`}>
+
+                                                {/* Main Row */}
+                                                <div className="flex justify-between items-center w-full">
+                                                    <div>
+                                                        <span className={`block font-medium text-sm ${isexecuted ? 'text-green-800 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>{pName}</span>
+                                                        {recipe.plotMetadata?.[pid]?.observation && (
+                                                            <span className="text-[10px] text-gray-500 italic block">"{recipe.plotMetadata[pid].observation}"</span>
+                                                        )}
+                                                        {recipe.plotMetadata?.[pid]?.affectedHectares && !isexecuted && (
+                                                            <span className="text-[10px] text-blue-600 block">{recipe.plotMetadata[pid].affectedHectares} ha</span>
+                                                        )}
+                                                    </div>
+
+                                                    {isexecuted ? (
+                                                        <div className="flex flex-col items-end gap-1 text-right max-w-[60%]">
+                                                            <div className="flex items-center gap-1 text-green-700 dark:text-green-400 font-bold text-xs">
+                                                                <span>{new Date(executionDetails?.executedAt || '').toLocaleDateString()}</span>
+                                                                <CheckCircle2 className="w-4 h-4" />
+                                                            </div>
+                                                            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">por {executionDetails?.executedBy || 'Desconocido'}</span>
+
+                                                            {executionDetails?.observation && (
+                                                                <div className="bg-white dark:bg-gray-800/50 px-2 py-1 rounded border border-green-100 dark:border-green-800 shadow-sm mt-1">
+                                                                    <p className="text-[10px] text-gray-600 dark:text-gray-400 italic">"{executionDetails.observation}"</p>
+                                                                </div>
+                                                            )}
+
+                                                            {executionDetails?.audioUrl && (
+                                                                <div className="mt-1">
+                                                                    <button
+                                                                        onClick={() => setPlayingAudioId(playingAudioId === pid ? null : pid)}
+                                                                        className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${playingAudioId === pid ? 'bg-blue-100 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                                                    >
+                                                                        {playingAudioId === pid ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                                                        {playingAudioId === pid ? 'Pausar Nota' : 'Escuchar Nota'}
+                                                                    </button>
+                                                                    {playingAudioId === pid && (
+                                                                        <audio src={executionDetails.audioUrl} autoPlay onEnded={() => setPlayingAudioId(null)} className="hidden" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleOpenExecutionModal(recipe, pid)}
+                                                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors shadow-sm self-center"
+                                                        >
+                                                            Marcar HECHO
+                                                        </button>
                                                     )}
                                                 </div>
 
-                                                {isexecuted ? (
-                                                    <div className="flex flex-col items-end gap-1 text-right max-w-[60%]">
-                                                        <div className="flex items-center gap-1 text-green-700 dark:text-green-400 font-bold text-xs">
-                                                            <span>{new Date(executionDetails?.executedAt || '').toLocaleDateString()}</span>
-                                                            <CheckCircle2 className="w-4 h-4" />
+                                                {/* Differences Warning Block */}
+                                                {differences.length > 0 && (
+                                                    <div className="mt-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-md p-2 animate-fade-in w-full">
+                                                        <div className="flex items-center gap-1 mb-1">
+                                                            <AlertTriangle className="w-3 h-3 text-red-600" />
+                                                            <span className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase">Diferencias</span>
                                                         </div>
-                                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">por {executionDetails?.executedBy || 'Desconocido'}</span>
-
-                                                        {executionDetails?.observation && (
-                                                            <div className="bg-white dark:bg-gray-800/50 px-2 py-1 rounded border border-green-100 dark:border-green-800 shadow-sm mt-1">
-                                                                <p className="text-[10px] text-gray-600 dark:text-gray-400 italic">"{executionDetails.observation}"</p>
-                                                            </div>
-                                                        )}
-
-                                                        {executionDetails?.audioUrl && (
-                                                            <div className="mt-1">
-                                                                <button
-                                                                    onClick={() => setPlayingAudioId(playingAudioId === pid ? null : pid)}
-                                                                    className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${playingAudioId === pid ? 'bg-blue-100 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                                                >
-                                                                    {playingAudioId === pid ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                                                                    {playingAudioId === pid ? 'Pausar Nota' : 'Escuchar Nota'}
-                                                                </button>
-                                                                {playingAudioId === pid && (
-                                                                    <audio src={executionDetails.audioUrl} autoPlay onEnded={() => setPlayingAudioId(null)} className="hidden" />
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                        <ul className="space-y-1">
+                                                            {differences.map((diff, i) => (
+                                                                <li key={i} className="text-[10px] text-red-600 dark:text-red-300 flex items-start gap-1">
+                                                                    <span className="mt-0.5">•</span> {diff}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
                                                     </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleOpenExecutionModal(recipe, pid)}
-                                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors shadow-sm self-center"
-                                                    >
-                                                        Marcar HECHO
-                                                    </button>
                                                 )}
                                             </div>
                                         );

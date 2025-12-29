@@ -982,27 +982,31 @@ export const DashboardView: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- SECTION 2: MAP --- */}
-            <div style={{ display: (visualMode === 'map' || isExporting) ? 'block' : 'none' }}>
+            {/* 3. MAP SECTION */}
+            <div ref={mapContainerRef} style={{ display: (visualMode === 'map' || isExporting) ? 'block' : 'none' }}>
                 <MapSection
                     ref={mapContainerRef}
                     monitorings={filteredMonitorings}
                     plots={filteredPlotsForTable}
-                    isVisible={visualMode === 'map' || isExporting}
+                    fields={data.fields}
+                    groups={data.plotGroups}
                     mapColorMode={mapColorMode}
+                    isVisible={visualMode === 'map' || isExporting}
                     selectedPestForMap={selectedMapPest}
                     summaries={filteredSummaries}
-                    isExporting={isExporting}
-                    onSelectSummary={setSelectedSummary}
-                    showHistory={showMapHistory}
                     assignments={data.assignments}
                     crops={data.crops}
                     seasonId={selectedSeasonId}
-                    tracks={mapColorMode === 'track' && selectedTrackUser ? tracks.filter(t => t.userName === selectedTrackUser) : (mapColorMode === 'track' ? tracks : [])}
-                    fields={data.fields}
-                    onOpenHistory={setHistoryPlotId}
+                    isExporting={isExporting}
+                    // onSelectSummary={setSelectedSummary} // Disable auto select for now during map view?
+                    showHistory={showMapHistory}
+                    tracks={tracks}
+                    onOpenHistory={(pid) => {
+                        setHistoryPlotId(pid);
+                    }}
                 />
             </div>
+
 
             {/* --- SECTION 3: LIST (Table) --- */}
             <div style={{ display: (visualMode === 'list' || isExporting) ? 'block' : 'none' }} className="flex flex-col gap-3">
