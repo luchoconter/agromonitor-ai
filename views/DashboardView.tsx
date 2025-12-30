@@ -582,16 +582,17 @@ export const DashboardView: React.FC = () => {
 
 
 
-    // --- NEW: DETERMINISTIC REPORT GENERATION ---
+    // --- NEW: DETERMINISTIC REPORT GENERATION (DARK MODE & VISUAL TRAVERSAL) ---
     const handleStartReportGeneration = async (selectedFieldIds: string[]) => {
         setIsReportWizardOpen(false);
         setIsGeneratingReport(true);
-        setGenerationProgress('Iniciando motor de reportes...');
+        setGenerationProgress('Iniciando motor de reportes profesional...');
 
         // 1. Save current state
         const originalFieldId = selectedFieldId;
         const originalCompanyId = selectedCompanyId;
         const originalMapMode = mapColorMode;
+        const originalVisualMode = visualMode;
 
         try {
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -600,324 +601,367 @@ export const DashboardView: React.FC = () => {
             const margin = 15;
             let yPos = 20;
 
-            // Force Global Context first
+            // --- PALETTE (DARK MODE) ---
+            const COLORS = {
+                bg: [17, 24, 39], // gray-900
+                card: [31, 41, 55], // gray-800
+                text: [243, 244, 246], // gray-100
+                textMuted: [156, 163, 175], // gray-400
+                primary: [22, 163, 74], // green-600
+                accent: [37, 99, 235], // blue-600
+                border: [55, 65, 81] // gray-700
+            };
+
+            const fillBackground = () => {
+                doc.setFillColor(COLORS.bg[0], COLORS.bg[1], COLORS.bg[2]);
+                doc.rect(0, 0, pageWidth, pageHeight, 'F');
+            };
+
+            // Paint first page background
+            fillBackground();
+
+            // --- SORTING LOGIC ---
+            // 1. Fields: Alphabetical (or preserve selection order if desired, but user asked for "original list order" which usually means data source order, but A-Z is safer for "Report")
+            const sortedFields = selectedFieldIds
+                .map(id => data.fields.find(f => f.id === id))
+                .filter(f => f !== undefined)
+                .sort((a, b) => (a?.name || '').localeCompare(b?.name || '')) as any[];
+
+            // --- GLOBAL CONTEXT SETUP ---
             setSelectedFieldId('');
             setVisualMode('charts');
-            setGenerationProgress('Procesando Gráficos Globales...');
+            setGenerationProgress('Generando Resumen Global...');
 
-            // Wait for charts to render
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for charts
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // --- GLOBAL SECTION ---
+            // --- GLOBAL HEADER ---
+            doc.setFillColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+            doc.rect(0, 0, pageWidth, 30, 'F');
 
-            // 1. Header
-            doc.setFillColor(22, 163, 74);
-            doc.rect(0, 0, pageWidth, 25, 'F');
+            // Logo placeholder or Title
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(18);
+            doc.setFontSize(22);
             doc.setFont("helvetica", "bold");
             const companyName = data.companies.find(c => c.id === effectiveCompanyId)?.name || 'Empresa';
-            doc.text(`INFORME CONSOLIDADO: ${companyName.toUpperCase()}`, 15, 17);
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text(`${new Date().toLocaleDateString()}`, pageWidth - 15, 17, { align: 'right' });
-            yPos = 40;
+            doc.text(`${companyName.toUpperCase()}`, 15, 20);
 
-            // 2. Global Lot Situation Table
-            doc.setTextColor(22, 163, 74);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(`INFORME DE SITUACIÓN INTEGRAL`, 15, 26);
+
+            doc.setFontSize(10);
+            const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            doc.text(dateStr.charAt(0).toUpperCase() + dateStr.slice(1), pageWidth - 15, 20, { align: 'right' });
+
+            yPos = 45;
+
+            // --- 1. GLOBAL LOT SITUATION (The consolidated table requested) ---
+            doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
             doc.text("1. SITUACIÓN GENERAL DE LOTES", 15, yPos);
             yPos += 10;
 
-            // Collect all plots from selected fields
-            const allSelectedPlots = data.plots.filter(p => selectedFieldIds.includes(p.fieldId));
-
             // Table Header
-            doc.setFillColor(240, 240, 240);
-            doc.rect(15, yPos, pageWidth - 30, 8, 'F');
-            doc.setFontSize(9);
-            doc.setTextColor(0, 0, 0);
-            doc.text("CAMPO / LOTE", 20, yPos + 6);
-            doc.text("CULTIVO", 80, yPos + 6);
-            doc.text("ESTADO", 120, yPos + 6);
-            doc.text("ÚLT. RECORRIDA", 160, yPos + 6);
+            doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
+            doc.rect(15, yPos, pageWidth - 30, 10, 'F');
+            doc.setFontSize(10);
+            doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+            doc.text("CAMPO", 20, yPos + 7);
+            doc.text("LOTE", 60, yPos + 7);
+            doc.text("CULTIVO", 100, yPos + 7);
+            doc.text("ESTADO", 140, yPos + 7);
+            doc.text("ÚLT. RECORRIDA", 175, yPos + 7);
             yPos += 10;
 
-            allSelectedPlots.forEach(plot => {
+            // Rows
+            let globalPlots: any[] = [];
+
+            // Collect all plots sorted by Field Name -> Plot Name
+            sortedFields.forEach(field => {
+                const plots = data.plots
+                    .filter(p => p.fieldId === field.id)
+                    .sort((a, b) => a.name.localeCompare(b.name)); // Lots A-Z
+                globalPlots = [...globalPlots, ...plots];
+            });
+
+            globalPlots.forEach((plot, index) => {
                 if (yPos > pageHeight - 20) {
                     doc.addPage();
+                    fillBackground();
                     yPos = 20;
+                    // Re-draw table header on new page? Optional, clean reports usually do.
+                    doc.setFontSize(8);
+                    doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
+                    doc.text("Continuación...", 15, yPos - 5);
                 }
+
+                // Alternating row color
+                if (index % 2 === 1) {
+                    doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]); // Slight bg for odd rows logic if using card color, or make it lighter/darker
+                    // Actually let's use a very transparent white or slightly lighter dark
+                    doc.setFillColor(255, 255, 255); // Alpha not easy in pure jsPDF without GState, sticky to simple logic
+                    // Dark mode alternating: default is bg, alternate is card
+                    doc.setFillColor(31, 41, 55);
+                    doc.rect(15, yPos, pageWidth - 30, 8, 'F');
+                }
+
                 const fieldName = data.fields.find(f => f.id === plot.fieldId)?.name || '-';
                 const assignment = data.assignments.find(a => a.plotId === plot.id && a.seasonId === selectedSeasonId);
                 const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name || '-';
 
+                // Get Latest Summary
                 const plotSummaries = data.lotSummaries.filter(s => s.plotId === plot.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 const latest = plotSummaries[0];
-                const status = latest ? (latest.engineerStatus || latest.status) : 'Sin Dato';
-                const dateStr = latest ? new Date(latest.date).toLocaleDateString() : '-';
+                const status = latest ? (latest.engineerStatus || latest.status) : 'gris';
+                const lastDate = latest ? new Date(latest.date).toLocaleDateString() : '-';
 
+                doc.setFontSize(9);
                 doc.setFont("helvetica", "normal");
-                doc.text(`${fieldName} - ${plot.name}`, 20, yPos);
-                doc.text(cropName, 80, yPos);
+                doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
 
-                // Colored Status Text
-                if (status === 'verde') doc.setTextColor(22, 163, 74);
-                else if (status === 'amarillo') doc.setTextColor(234, 179, 8);
-                else if (status === 'rojo') doc.setTextColor(220, 38, 38);
-                else doc.setTextColor(100, 100, 100);
+                doc.text(fieldName, 20, yPos + 5);
+                doc.text(plot.name, 60, yPos + 5);
+                doc.text(cropName, 100, yPos + 5);
 
-                doc.text(status.toUpperCase(), 120, yPos);
-                doc.setTextColor(0, 0, 0);
-                doc.text(dateStr, 160, yPos);
+                // Status Badge logic
+                let r = 107, g = 114, b = 128; // gray
+                if (status === 'verde') { r = 22; g = 163; b = 74; }
+                if (status === 'amarillo') { r = 234; g = 179; b = 8; }
+                if (status === 'rojo') { r = 220; g = 38; b = 38; }
 
-                doc.setDrawColor(230, 230, 230);
-                doc.line(15, yPos + 2, pageWidth - 15, yPos + 2);
+                doc.setTextColor(r, g, b);
+                doc.setFont("helvetica", "bold");
+                doc.text(status.toUpperCase(), 140, yPos + 5);
+
+                doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+                doc.setFont("helvetica", "normal");
+                doc.text(lastDate, 175, yPos + 5);
+
                 yPos += 8;
             });
 
-            // 3. Global Charts
+            // --- 2. GLOBAL CHARTS ---
+            yPos += 10;
             if (chartsContainerRef.current) {
-                yPos += 10;
-                if (yPos + 80 > pageHeight - 20) {
+                if (yPos + 90 > pageHeight - 20) {
                     doc.addPage();
+                    fillBackground();
                     yPos = 20;
                 }
 
-                doc.setTextColor(22, 163, 74);
+                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
                 doc.setFontSize(14);
                 doc.setFont("helvetica", "bold");
-                doc.text("2. EVOLUCIÓN Y PLAGAS (GLOBAL)", 15, yPos);
+                doc.text("2. EVOLUCIÓN GLOBAL Y PLAGAS", 15, yPos);
                 yPos += 10;
 
                 try {
-                    const chartsCanvas = await html2canvas(chartsContainerRef.current, { scale: 2 });
-                    const chartsImg = chartsCanvas.toDataURL('image/png');
-                    const chartsHeight = 80; // Fixed height for charts
-                    doc.addImage(chartsImg, 'PNG', 15, yPos, pageWidth - 30, chartsHeight);
-                    yPos += chartsHeight + 15;
+                    // Dark mode capture might need style adjustments if chart transparent. 
+                    // Assuming charts render in dark mode on screen first.
+                    const canvas = await html2canvas(chartsContainerRef.current, {
+                        scale: 2,
+                        backgroundColor: '#111827' // Force dark bg
+                    });
+                    const img = canvas.toDataURL('image/png');
+                    doc.addImage(img, 'PNG', 15, yPos, pageWidth - 30, 80);
+                    yPos += 90;
                 } catch (e) {
                     console.warn("Global charts capture failed", e);
                 }
             }
 
-            doc.addPage();
-            yPos = 20;
+            // --- FIELD ITERATION (The "Visual Traversal") ---
 
-            // Helper for page breaks
-            const checkPageBreak = (heightNeeded: number) => {
-                if (yPos + heightNeeded > pageHeight - margin) {
-                    doc.addPage();
-                    yPos = 20;
-                    return true;
-                }
-                return false;
-            };
-
-            // Force Map Mode to Status for visualization
+            // Prepare Map Mode
+            setVisualMode('map');
             setMapColorMode('status');
 
-            // 2. Iterate Fields
-            for (let i = 0; i < selectedFieldIds.length; i++) {
-                const fieldId = selectedFieldIds[i];
-                const field = data.fields.find(f => f.id === fieldId);
-                const company = data.companies.find(c => c.id === field?.companyId);
+            for (let i = 0; i < sortedFields.length; i++) {
+                const field = sortedFields[i];
+                setGenerationProgress(`Analizando Campo: ${field.name} (${i + 1}/${sortedFields.length})...`);
 
-                if (!field) continue;
+                // 1. VISUAL NAVIGATION
+                setSelectedFieldId(field.id);
+                // Force map recenter/zoom by context switch
 
-                setGenerationProgress(`Procesando Campo: ${field.name} (${i + 1}/${selectedFieldIds.length})...`);
+                // 2. WAIT FOR MAP RENDER
+                // Wait enough for tiles and markers to settle.
+                await new Promise(resolve => setTimeout(resolve, 2500));
 
-                // SWITCH CONTEXT
-                setSelectedCompanyId(field.companyId);
-                setSelectedFieldId(fieldId);
-
-                // WAIT FOR RENDER & TILES (Crucial for Map Capture)
-                // We assume MapSection uses selectedFieldId to center map.
-                // We wait 3 seconds to be safe for tiles to load.
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                // --- GENERATE FIELD REPORT SECTION ---
-
-                // A. Header (New Page for each field usually, or separator)
-                if (i > 0) doc.addPage();
+                // 3. START NEW PAGE
+                doc.addPage();
+                fillBackground();
                 yPos = 20;
 
-                // Header Box
-                doc.setFillColor(22, 163, 74);
-                doc.rect(0, 0, pageWidth, 25, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(18);
+                // 4. FIELD HEADER
+                doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
+                doc.roundedRect(15, 15, pageWidth - 30, 20, 3, 3, 'F');
+
+                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+                doc.setFontSize(16);
                 doc.setFont("helvetica", "bold");
-                doc.text(`INFORME DE SITUACIÓN: ${field.name.toUpperCase()}`, 15, 17);
+                doc.text(field.name.toUpperCase(), 20, 28);
+
+                const fieldPlots = data.plots.filter(p => p.fieldId === field.id);
+                const totalHas = fieldPlots.reduce((sum, p) => sum + (p.hectares || 0), 0);
 
                 doc.setFontSize(10);
-                doc.setFont("helvetica", "normal");
-                doc.text(`${company?.name || 'Empresa'} | ${new Date().toLocaleDateString()}`, pageWidth - 15, 17, { align: 'right' });
+                doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
+                doc.text(`${fieldPlots.length} Lotes | ${totalHas} Has Totales`, pageWidth - 25, 28, { align: 'right' });
 
-                yPos = 40;
+                yPos = 45;
 
-                // B. Map Capture
-                if (mapContainerRef.current) {
-                    doc.setTextColor(22, 163, 74);
-                    doc.setFontSize(14);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("1. MAPA DE ESTADO ACTUAL (SEMÁFORO)", 15, yPos);
-                    yPos += 8;
-
-                    try {
-                        const mapCanvas = await html2canvas(mapContainerRef.current, { useCORS: true, scale: 2 });
-                        const mapImg = mapCanvas.toDataURL('image/png');
-                        const mapRatio = mapCanvas.height / mapCanvas.width;
-                        const mapHeight = Math.min((pageWidth - 30) * mapRatio, 130);
-                        doc.addImage(mapImg, 'PNG', 15, yPos, pageWidth - 30, mapHeight);
-                        yPos += mapHeight + 15;
-                    } catch (e) {
-                        console.warn("Map capture error", e);
-                    }
-                }
-
-                // C. Lot Situation Table
-                checkPageBreak(60);
-                doc.setTextColor(22, 163, 74);
-                doc.setFontSize(14);
+                // 5. ACTIVITY SUMMARY (Last 30 days)
+                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+                doc.setFontSize(12);
                 doc.setFont("helvetica", "bold");
-                doc.text("2. DETALLE POR LOTE", 15, yPos);
-                yPos += 10;
+                doc.text("RESUMEN DE ACTIVIDAD (30 DÍAS)", 15, yPos);
+                yPos += 8;
 
-                const plots = data.plots.filter(p => p.fieldId === fieldId);
-
-                // Table Header
-                doc.setFillColor(240, 240, 240);
-                doc.rect(15, yPos, pageWidth - 30, 8, 'F');
-                doc.setFontSize(9);
-                doc.setTextColor(0, 0, 0);
-                doc.text("LOTE", 20, yPos + 6);
-                doc.text("CULTIVO", 60, yPos + 6);
-                doc.text("ESTADO", 100, yPos + 6);
-                doc.text("ÚLT. RECORRIDA", 140, yPos + 6);
-
-                yPos += 10;
-
-                plots.forEach(plot => {
-                    checkPageBreak(10);
-                    // Get data
-                    const assignment = data.assignments.find(a => a.plotId === plot.id && a.seasonId === selectedSeasonId);
-                    const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name || '-';
-
-                    // Latest summary (copied logic)
-                    const plotSummaries = data.lotSummaries.filter(s => s.plotId === plot.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                    const latest = plotSummaries[0];
-                    const status = latest ? (latest.engineerStatus || latest.status) : 'Sin Dato';
-                    const dateStr = latest ? new Date(latest.date).toLocaleDateString() : '-';
-
-                    doc.setFont("helvetica", "normal");
-                    doc.text(plot.name, 20, yPos);
-                    doc.text(cropName, 60, yPos);
-
-                    // Colored Status Text
-                    if (status === 'verde') doc.setTextColor(22, 163, 74);
-                    else if (status === 'amarillo') doc.setTextColor(234, 179, 8);
-                    else if (status === 'rojo') doc.setTextColor(220, 38, 38);
-                    else doc.setTextColor(100, 100, 100);
-
-                    doc.text(status.toUpperCase(), 100, yPos);
-
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(dateStr, 140, yPos);
-
-                    doc.setDrawColor(230, 230, 230);
-                    doc.line(15, yPos + 2, pageWidth - 15, yPos + 2);
-                    yPos += 8;
-                });
-                yPos += 10;
-
-                // D. Pending Recipes
-                const fieldPrescriptions = data.prescriptions.filter(p => p.fieldId === fieldId && p.status === 'active');
-                const pendingRecipes = fieldPrescriptions.filter(p => {
-                    // Check if ANY plot in this field is pending for this recipe
-                    return p.plotIds.some(pid => !p.executionData?.[pid]?.executed);
-                });
-
-                if (pendingRecipes.length > 0) {
-                    checkPageBreak(50);
-                    doc.setTextColor(22, 163, 74);
-                    doc.setFontSize(14);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("3. RECETAS PENDIENTES DE APLICACIÓN", 15, yPos);
-                    yPos += 10;
-
-                    pendingRecipes.forEach(recipe => {
-                        checkPageBreak(25);
-                        doc.setFillColor(250, 250, 255);
-                        doc.roundedRect(15, yPos, pageWidth - 30, 20, 2, 2, 'F');
-
-                        doc.setFontSize(10);
-                        doc.setTextColor(0, 0, 0);
-                        doc.setFont("helvetica", "bold");
-                        doc.text(`Fecha: ${new Date(recipe.createdAt).toLocaleDateString()}`, 20, yPos + 7);
-                        if (recipe.notes) {
-                            doc.setFont("helvetica", "italic");
-                            doc.setTextColor(100, 100, 100);
-                            doc.text(`"${recipe.notes}"`, 70, yPos + 7);
-                        }
-
-                        doc.setTextColor(50, 50, 50);
-                        doc.setFont("helvetica", "normal");
-                        const itemsStr = recipe.items.map(i => `${i.supplyName} (${i.dose} ${i.unit})`).join(', ');
-                        doc.text(itemsStr, 20, yPos + 15);
-
-                        yPos += 25;
-                    });
-                }
-
-                // E. Work Summary (KPIs)
-                checkPageBreak(40);
-                doc.setTextColor(22, 163, 74);
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text("4. RESUMEN DE ACTIVIDAD (30 DÍAS)", 15, yPos);
-                yPos += 10;
-
+                // Calc stats
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-                // Count monitorings for this field
-                const fieldMonitorings = data.monitorings.filter(m => m.fieldId === fieldId && new Date(m.date) >= thirtyDaysAgo);
-                const fieldSummariesCount = data.lotSummaries.filter(s => s.fieldId === fieldId && new Date(s.date) >= thirtyDaysAgo).length;
+                const recentsMonitorings = data.monitorings.filter(m => m.fieldId === field.id && new Date(m.date) >= thirtyDaysAgo).length;
+                const recentsTracks = tracks?.filter(t => {
+                    // Filter tracks by field is tricky if track doesn't have fieldId. 
+                    // Usually tracks are geo-spatial. We'll skip complex geo-check and use company/date context or skipped if not available.
+                    // Simple fallback: count monitoring/summaries is more accurate for "Ingeniero activity".
+                    return false;
+                }).length || 0;
+                const recentSummaries = data.lotSummaries.filter(s => {
+                    const plot = data.plots.find(p => p.id === s.plotId);
+                    return plot?.fieldId === field.id && new Date(s.date) >= thirtyDaysAgo;
+                }).length;
 
-                doc.setDrawColor(200, 200, 200);
-                doc.rect(15, yPos, (pageWidth - 40) / 2, 25);
-                doc.rect(20 + ((pageWidth - 40) / 2), yPos, (pageWidth - 40) / 2, 25);
+                // Draw Activity Cards
+                const drawCard = (x: number, title: string, count: number) => {
+                    doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
+                    doc.roundedRect(x, yPos, 55, 20, 2, 2, 'F');
+                    doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+                    doc.setFontSize(16);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(count.toString(), x + 27.5, yPos + 10, { align: 'center' }); // center number
+                    doc.setFontSize(8);
+                    doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
+                    doc.text(title, x + 27.5, yPos + 16, { align: 'center' });
+                };
 
-                doc.setFontSize(20);
-                doc.setTextColor(0, 0, 0);
-                doc.text(fieldMonitorings.length.toString(), 25, yPos + 15);
-                doc.text(fieldSummariesCount.toString(), 30 + ((pageWidth - 40) / 2), yPos + 15);
+                drawCard(15, "Muestreos de Plagas", recentsMonitorings);
+                drawCard(75, "Recorridas / Cierres", recentSummaries);
+                // Optional 3rd card
+                const activeRecipes = data.prescriptions.filter(p => !p.archived && p.plotIds.some(pid => data.plots.find(pl => pl.id === pid)?.fieldId === field.id) && new Date(p.createdAt) >= thirtyDaysAgo).length;
+                drawCard(135, "Recetas Generadas", activeRecipes);
 
-                doc.setFontSize(10);
-                doc.setTextColor(100, 100, 100);
-                doc.text("Muestreos de Plagas", 25, yPos + 22);
-                doc.text("Recorridas / Cierres de Lote", 30 + ((pageWidth - 40) / 2), yPos + 22);
+                yPos += 30;
 
-                yPos += 35;
+                // 6. MAP CAPTURE (SEMAPHORE)
+                if (mapContainerRef.current) {
+                    doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("MAPA DE ESTADO ACTUAL", 15, yPos);
+                    yPos += 8;
+
+                    try {
+                        const mapCanvas = await html2canvas(mapContainerRef.current, {
+                            useCORS: true,
+                            scale: 2,
+                            // Map often has transparent layers, ensure bg is dark
+                            backgroundColor: '#111827'
+                        });
+                        const mapImg = mapCanvas.toDataURL('image/png');
+                        // 16:9 ratio approx
+                        const imgHeight = 90;
+                        doc.addImage(mapImg, 'PNG', 15, yPos, pageWidth - 30, imgHeight);
+                        yPos += imgHeight + 10;
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+
+                if (yPos > pageHeight - 40) { doc.addPage(); fillBackground(); yPos = 20; }
+
+                // 7. PENDING RECIPES DETAILED
+                const fieldPendingRecipes = data.prescriptions.filter(p =>
+                    p.status === 'active' &&
+                    !p.archived &&
+                    p.plotIds.some(pid =>
+                        data.plots.find(pl => pl.id === pid)?.fieldId === field.id &&
+                        !p.executionData?.[pid]?.executed // Not executed on this plot
+                    )
+                );
+
+                if (fieldPendingRecipes.length > 0) {
+                    doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("RECETAS PENDIENTES DE APLICACIÓN", 15, yPos);
+                    yPos += 8;
+
+                    fieldPendingRecipes.forEach(recipe => {
+                        if (yPos > pageHeight - 30) { doc.addPage(); fillBackground(); yPos = 20; }
+
+                        // Recipe Card
+                        doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
+                        doc.roundedRect(15, yPos, pageWidth - 30, 24, 2, 2, 'F');
+
+                        // Left strip (priority color?)
+                        doc.setFillColor(234, 179, 8); // Yellow for pending
+                        doc.rect(15, yPos, 2, 24, 'F');
+
+                        doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+                        doc.setFontSize(10);
+                        doc.setFont("helvetica", "bold");
+                        const dateRec = new Date(recipe.createdAt).toLocaleDateString();
+                        doc.text(`Fecha: ${dateRec}`, 20, yPos + 7);
+
+                        // Target Plots
+                        const targetPlotNames = recipe.plotIds
+                            .map(pid => data.plots.find(pl => pl.id === pid))
+                            .filter(pl => pl?.fieldId === field.id && !recipe.executionData?.[pl?.id!]?.executed)
+                            .map(pl => pl?.name)
+                            .join(', ');
+
+                        doc.setFontSize(9);
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
+                        doc.text(`Lotes: ${targetPlotNames}`, 20, yPos + 12);
+
+                        // Products Summary
+                        const products = recipe.items.map(i => `${i.productName} (${i.dose} ${i.unit})`).join(' + ');
+                        doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+                        doc.text(products, 20, yPos + 18);
+
+                        yPos += 28;
+                    });
+                }
             }
 
-            doc.save(`Informe_Situacion_${new Date().toISOString().split('T')[0]}.pdf`);
-            showNotification("Informe Generado Exitosamente", "success");
+            // Save PDF
+            const fileName = `Informe_${companyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
+
+            showNotification("Informe generado exitosamente", "success");
 
         } catch (error) {
-            console.error(error);
-            showNotification("Error al generar informe", "error");
+            console.error("Error generating report:", error);
+            showNotification("Error al generar el informe.", "error");
         } finally {
             // Restore State
-            setSelectedCompanyId(originalCompanyId);
             setSelectedFieldId(originalFieldId);
+            setSelectedCompanyId(originalCompanyId);
             setMapColorMode(originalMapMode);
+            setVisualMode(originalVisualMode);
+
             setIsGeneratingReport(false);
             setGenerationProgress('');
         }
     };
+
+
 
     const handleExportExcel = () => {
         const exportData = filteredSummaries.map(s => {
@@ -1358,6 +1402,10 @@ export const DashboardView: React.FC = () => {
                             <BarChart2 className="w-3 h-3 mr-1.5" /> Gráficos
                         </button>
                     </div>
+
+                    <button onClick={() => setIsReportWizardOpen(true)} className="ml-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center bg-green-600 text-white hover:bg-green-700 shadow-sm">
+                        <FileSpreadsheet className="w-3 h-3 mr-1.5" /> Reportes
+                    </button>
                 </div>
             </div>
 

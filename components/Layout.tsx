@@ -11,6 +11,7 @@ import { useTracking } from '../contexts/TrackingContext';
 import { Modal } from './UI'; // Ensure Modal is imported if it exists, otherwise use custom div
 
 import { TrackingStartModal } from './tracking/TrackingStartModal';
+import { InstallInstructionsModal } from './InstallInstructionsModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,6 +35,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // New: PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   // New: Track Metadata State
   const [trackName, setTrackName] = useState('');
@@ -41,6 +45,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSavingDetails, setIsSavingDetails] = useState(false);
 
   useEffect(() => {
+    // Detect Standalone Mode
+    const checkStandalone = () => {
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+      setIsStandalone(isStandaloneMode);
+    };
+
+    checkStandalone();
+    window.matchMedia('(display-mode: standalone)').addEventListener('change', checkStandalone);
+
+    // Detect iOS
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(iOS);
+
     const handleBeforeInstallPrompt = (e: any) => {
       // Prevent browser default
       e.preventDefault();
@@ -56,11 +73,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      // If no prompt available (iOS or already dismissed), show manual instructions
+      setShowInstallModal(true);
     }
   };
 
@@ -256,6 +277,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         }}
       />
 
+
+      {/* INSTALL INSTRUCTIONS MODAL */}
+      <InstallInstructionsModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        isIOS={isIOS}
+      />
+
       {/* STOP TRACKING MODAL */}
       {showStopModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -345,7 +374,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button onClick={logout} className="w-full flex items-center justify-center px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"><LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión</button>
 
                 {/* Mobile Install Button */}
-                {deferredPrompt && (
+                {!isStandalone && (
                   <button
                     onClick={handleInstallClick}
                     className="w-full flex items-center justify-center px-4 py-2 mt-2 bg-agro-600 text-white rounded-lg hover:bg-agro-700 transition-colors text-sm font-medium"
@@ -483,7 +512,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="flex flex-col items-end mr-1"><span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{currentUser.name}</span><span className="text-xs text-gray-500 dark:text-blue-300 capitalize">{currentUser.role}</span></div>
 
               {/* Desktop Install Button */}
-              {deferredPrompt && (
+              {!isStandalone && (
                 <button
                   onClick={handleInstallClick}
                   className="p-2 text-agro-600 hover:bg-agro-50 dark:text-agro-400 dark:hover:bg-agro-900/20 rounded-lg transition-colors"
