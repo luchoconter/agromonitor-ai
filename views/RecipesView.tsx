@@ -371,6 +371,69 @@ export const RecipesView: React.FC = () => {
             doc.text(currentUser?.name || "Ingeniero Responsable", pageWidth / 2, signatureY + 5, { align: 'center' });
         });
 
+        // --- NEW: SHOPPING LIST PAGE ---
+        if (Object.keys(calculateShoppingList).length > 0) {
+            doc.addPage();
+            doc.setFillColor(22, 163, 74); // Agro Green
+            doc.rect(0, 0, pageWidth, 30, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.setFont("helvetica", "bold");
+            doc.text("LISTA DE COMPRAS CONSOLIDADA", margin, 20);
+
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text("Resumen de Insumos", pageWidth - margin, 20, { align: 'right' });
+
+            yPos = 40;
+
+            // Summary Box
+            doc.setDrawColor(200, 200, 200);
+            doc.setFillColor(250, 250, 250);
+            doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 20, 2, 2, 'FD');
+
+            doc.setTextColor(50, 50, 50);
+            doc.setFontSize(10);
+            doc.text(`Total de Recetas: ${selectedRecipeIds.length}`, margin + 5, yPos + 12);
+
+            yPos += 30;
+
+            Object.entries(calculateShoppingList).forEach(([type, items]) => {
+                // Category Header
+                doc.setFillColor(240, 240, 240);
+                doc.rect(margin, yPos, pageWidth - (margin * 2), 8, 'F');
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(11);
+                doc.setTextColor(0, 0, 0);
+                doc.text(type.toUpperCase(), margin + 5, yPos + 6);
+                yPos += 12;
+
+                // Table Header
+                doc.setFontSize(9);
+                doc.text("INSUMO / PRODUCTO", margin + 5, yPos);
+                doc.text("CANTIDAD TOTAL", pageWidth - margin - 5, yPos, { align: 'right' });
+
+                doc.setDrawColor(100, 100, 100);
+                doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
+                yPos += 8;
+
+                // Items
+                doc.setFont("helvetica", "normal");
+                items.forEach((item) => {
+                    doc.text(item.name, margin + 5, yPos);
+                    const qtyText = `${item.quantity.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.unit}`;
+                    doc.text(qtyText, pageWidth - margin - 5, yPos, { align: 'right' });
+
+                    doc.setDrawColor(230, 230, 230);
+                    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
+                    yPos += 8;
+                });
+
+                yPos += 5; // Spacing between categories
+            });
+        }
+
         return doc;
     };
 

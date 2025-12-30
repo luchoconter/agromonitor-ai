@@ -30,6 +30,7 @@ import { LotHistoryModal } from '../components/dashboard/LotHistoryModal';
 import { LotStatusModal } from '../components/dashboard/LotStatusModal';
 import { BudgetSection } from '../components/dashboard/BudgetSection';
 import { HeatmapSection } from '../components/dashboard/HeatmapSection';
+import { ReportWizardModal } from '../components/reports/ReportWizardModal';
 
 export const DashboardView: React.FC = () => {
     const { data, userCompanies, dataOwnerId } = useData();
@@ -67,6 +68,11 @@ export const DashboardView: React.FC = () => {
 
     const [showAiModal, setShowAiModal] = useState(false);
     const [editableReport, setEditableReport] = useState('');
+
+    // REPORT WIZARD STATE
+    const [isReportWizardOpen, setIsReportWizardOpen] = useState(false);
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+    const [generationProgress, setGenerationProgress] = useState('');
 
     // Sorting State
     const [sortConfig, setSortConfig] = useState<{ key: 'date' | 'status' | 'name', direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -574,37 +580,343 @@ export const DashboardView: React.FC = () => {
         return "Informe Global";
     };
 
-    const handleAnalyze = async () => {
-        setIsAnalyzing(true);
-        let scope = "Global";
-        if (effectiveCompanyId) {
-            scope = `Empresa: ${userCompanies.find(c => c.id === effectiveCompanyId)?.name}`;
-            if (selectedFieldId) {
-                scope += `, Campo: ${data.fields.find(f => f.id === selectedFieldId)?.name}`;
+
+
+    // --- NEW: DETERMINISTIC REPORT GENERATION ---
+    const handleStartReportGeneration = async (selectedFieldIds: string[]) => {
+        setIsReportWizardOpen(false);
+        setIsGeneratingReport(true);
+        setGenerationProgress('Iniciando motor de reportes...');
+
+        // 1. Save current state
+        const originalFieldId = selectedFieldId;
+        const originalCompanyId = selectedCompanyId;
+        const originalMapMode = mapColorMode;
+
+        try {
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 15;
+            let yPos = 20;
+
+            // Force Global Context first
+            setSelectedFieldId('');
+            setVisualMode('charts');
+            setGenerationProgress('Procesando Gráficos Globales...');
+
+            // Wait for charts to render
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // --- GLOBAL SECTION ---
+
+            // 1. Header
+            doc.setFillColor(22, 163, 74);
+            doc.rect(0, 0, pageWidth, 25, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            const companyName = data.companies.find(c => c.id === effectiveCompanyId)?.name || 'Empresa';
+            doc.text(`INFORME CONSOLIDADO: ${companyName.toUpperCase()}`, 15, 17);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`${new Date().toLocaleDateString()}`, pageWidth - 15, 17, { align: 'right' });
+            yPos = 40;
+
+            // 2. Global Lot Situation Table
+            doc.setTextColor(22, 163, 74);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text("1. SITUACIÓN GENERAL DE LOTES", 15, yPos);
+            yPos += 10;
+
+            // Collect all plots from selected fields
+            const allSelectedPlots = data.plots.filter(p => selectedFieldIds.includes(p.fieldId));
+
+            // Table Header
+            doc.setFillColor(240, 240, 240);
+            doc.rect(15, yPos, pageWidth - 30, 8, 'F');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text("CAMPO / LOTE", 20, yPos + 6);
+            doc.text("CULTIVO", 80, yPos + 6);
+            doc.text("ESTADO", 120, yPos + 6);
+            doc.text("ÚLT. RECORRIDA", 160, yPos + 6);
+            yPos += 10;
+
+            allSelectedPlots.forEach(plot => {
+                if (yPos > pageHeight - 20) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                const fieldName = data.fields.find(f => f.id === plot.fieldId)?.name || '-';
+                const assignment = data.assignments.find(a => a.plotId === plot.id && a.seasonId === selectedSeasonId);
+                const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name || '-';
+
+                const plotSummaries = data.lotSummaries.filter(s => s.plotId === plot.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const latest = plotSummaries[0];
+                const status = latest ? (latest.engineerStatus || latest.status) : 'Sin Dato';
+                const dateStr = latest ? new Date(latest.date).toLocaleDateString() : '-';
+
+                doc.setFont("helvetica", "normal");
+                doc.text(`${fieldName} - ${plot.name}`, 20, yPos);
+                doc.text(cropName, 80, yPos);
+
+                // Colored Status Text
+                if (status === 'verde') doc.setTextColor(22, 163, 74);
+                else if (status === 'amarillo') doc.setTextColor(234, 179, 8);
+                else if (status === 'rojo') doc.setTextColor(220, 38, 38);
+                else doc.setTextColor(100, 100, 100);
+
+                doc.text(status.toUpperCase(), 120, yPos);
+                doc.setTextColor(0, 0, 0);
+                doc.text(dateStr, 160, yPos);
+
+                doc.setDrawColor(230, 230, 230);
+                doc.line(15, yPos + 2, pageWidth - 15, yPos + 2);
+                yPos += 8;
+            });
+
+            // 3. Global Charts
+            if (chartsContainerRef.current) {
+                yPos += 10;
+                if (yPos + 80 > pageHeight - 20) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+
+                doc.setTextColor(22, 163, 74);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("2. EVOLUCIÓN Y PLAGAS (GLOBAL)", 15, yPos);
+                yPos += 10;
+
+                try {
+                    const chartsCanvas = await html2canvas(chartsContainerRef.current, { scale: 2 });
+                    const chartsImg = chartsCanvas.toDataURL('image/png');
+                    const chartsHeight = 80; // Fixed height for charts
+                    doc.addImage(chartsImg, 'PNG', 15, yPos, pageWidth - 30, chartsHeight);
+                    yPos += chartsHeight + 15;
+                } catch (e) {
+                    console.warn("Global charts capture failed", e);
+                }
             }
+
+            doc.addPage();
+            yPos = 20;
+
+            // Helper for page breaks
+            const checkPageBreak = (heightNeeded: number) => {
+                if (yPos + heightNeeded > pageHeight - margin) {
+                    doc.addPage();
+                    yPos = 20;
+                    return true;
+                }
+                return false;
+            };
+
+            // Force Map Mode to Status for visualization
+            setMapColorMode('status');
+
+            // 2. Iterate Fields
+            for (let i = 0; i < selectedFieldIds.length; i++) {
+                const fieldId = selectedFieldIds[i];
+                const field = data.fields.find(f => f.id === fieldId);
+                const company = data.companies.find(c => c.id === field?.companyId);
+
+                if (!field) continue;
+
+                setGenerationProgress(`Procesando Campo: ${field.name} (${i + 1}/${selectedFieldIds.length})...`);
+
+                // SWITCH CONTEXT
+                setSelectedCompanyId(field.companyId);
+                setSelectedFieldId(fieldId);
+
+                // WAIT FOR RENDER & TILES (Crucial for Map Capture)
+                // We assume MapSection uses selectedFieldId to center map.
+                // We wait 3 seconds to be safe for tiles to load.
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // --- GENERATE FIELD REPORT SECTION ---
+
+                // A. Header (New Page for each field usually, or separator)
+                if (i > 0) doc.addPage();
+                yPos = 20;
+
+                // Header Box
+                doc.setFillColor(22, 163, 74);
+                doc.rect(0, 0, pageWidth, 25, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(18);
+                doc.setFont("helvetica", "bold");
+                doc.text(`INFORME DE SITUACIÓN: ${field.name.toUpperCase()}`, 15, 17);
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text(`${company?.name || 'Empresa'} | ${new Date().toLocaleDateString()}`, pageWidth - 15, 17, { align: 'right' });
+
+                yPos = 40;
+
+                // B. Map Capture
+                if (mapContainerRef.current) {
+                    doc.setTextColor(22, 163, 74);
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("1. MAPA DE ESTADO ACTUAL (SEMÁFORO)", 15, yPos);
+                    yPos += 8;
+
+                    try {
+                        const mapCanvas = await html2canvas(mapContainerRef.current, { useCORS: true, scale: 2 });
+                        const mapImg = mapCanvas.toDataURL('image/png');
+                        const mapRatio = mapCanvas.height / mapCanvas.width;
+                        const mapHeight = Math.min((pageWidth - 30) * mapRatio, 130);
+                        doc.addImage(mapImg, 'PNG', 15, yPos, pageWidth - 30, mapHeight);
+                        yPos += mapHeight + 15;
+                    } catch (e) {
+                        console.warn("Map capture error", e);
+                    }
+                }
+
+                // C. Lot Situation Table
+                checkPageBreak(60);
+                doc.setTextColor(22, 163, 74);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("2. DETALLE POR LOTE", 15, yPos);
+                yPos += 10;
+
+                const plots = data.plots.filter(p => p.fieldId === fieldId);
+
+                // Table Header
+                doc.setFillColor(240, 240, 240);
+                doc.rect(15, yPos, pageWidth - 30, 8, 'F');
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                doc.text("LOTE", 20, yPos + 6);
+                doc.text("CULTIVO", 60, yPos + 6);
+                doc.text("ESTADO", 100, yPos + 6);
+                doc.text("ÚLT. RECORRIDA", 140, yPos + 6);
+
+                yPos += 10;
+
+                plots.forEach(plot => {
+                    checkPageBreak(10);
+                    // Get data
+                    const assignment = data.assignments.find(a => a.plotId === plot.id && a.seasonId === selectedSeasonId);
+                    const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name || '-';
+
+                    // Latest summary (copied logic)
+                    const plotSummaries = data.lotSummaries.filter(s => s.plotId === plot.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    const latest = plotSummaries[0];
+                    const status = latest ? (latest.engineerStatus || latest.status) : 'Sin Dato';
+                    const dateStr = latest ? new Date(latest.date).toLocaleDateString() : '-';
+
+                    doc.setFont("helvetica", "normal");
+                    doc.text(plot.name, 20, yPos);
+                    doc.text(cropName, 60, yPos);
+
+                    // Colored Status Text
+                    if (status === 'verde') doc.setTextColor(22, 163, 74);
+                    else if (status === 'amarillo') doc.setTextColor(234, 179, 8);
+                    else if (status === 'rojo') doc.setTextColor(220, 38, 38);
+                    else doc.setTextColor(100, 100, 100);
+
+                    doc.text(status.toUpperCase(), 100, yPos);
+
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(dateStr, 140, yPos);
+
+                    doc.setDrawColor(230, 230, 230);
+                    doc.line(15, yPos + 2, pageWidth - 15, yPos + 2);
+                    yPos += 8;
+                });
+                yPos += 10;
+
+                // D. Pending Recipes
+                const fieldPrescriptions = data.prescriptions.filter(p => p.fieldId === fieldId && p.status === 'active');
+                const pendingRecipes = fieldPrescriptions.filter(p => {
+                    // Check if ANY plot in this field is pending for this recipe
+                    return p.plotIds.some(pid => !p.executionData?.[pid]?.executed);
+                });
+
+                if (pendingRecipes.length > 0) {
+                    checkPageBreak(50);
+                    doc.setTextColor(22, 163, 74);
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("3. RECETAS PENDIENTES DE APLICACIÓN", 15, yPos);
+                    yPos += 10;
+
+                    pendingRecipes.forEach(recipe => {
+                        checkPageBreak(25);
+                        doc.setFillColor(250, 250, 255);
+                        doc.roundedRect(15, yPos, pageWidth - 30, 20, 2, 2, 'F');
+
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont("helvetica", "bold");
+                        doc.text(`Fecha: ${new Date(recipe.createdAt).toLocaleDateString()}`, 20, yPos + 7);
+                        if (recipe.notes) {
+                            doc.setFont("helvetica", "italic");
+                            doc.setTextColor(100, 100, 100);
+                            doc.text(`"${recipe.notes}"`, 70, yPos + 7);
+                        }
+
+                        doc.setTextColor(50, 50, 50);
+                        doc.setFont("helvetica", "normal");
+                        const itemsStr = recipe.items.map(i => `${i.supplyName} (${i.dose} ${i.unit})`).join(', ');
+                        doc.text(itemsStr, 20, yPos + 15);
+
+                        yPos += 25;
+                    });
+                }
+
+                // E. Work Summary (KPIs)
+                checkPageBreak(40);
+                doc.setTextColor(22, 163, 74);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("4. RESUMEN DE ACTIVIDAD (30 DÍAS)", 15, yPos);
+                yPos += 10;
+
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                // Count monitorings for this field
+                const fieldMonitorings = data.monitorings.filter(m => m.fieldId === fieldId && new Date(m.date) >= thirtyDaysAgo);
+                const fieldSummariesCount = data.lotSummaries.filter(s => s.fieldId === fieldId && new Date(s.date) >= thirtyDaysAgo).length;
+
+                doc.setDrawColor(200, 200, 200);
+                doc.rect(15, yPos, (pageWidth - 40) / 2, 25);
+                doc.rect(20 + ((pageWidth - 40) / 2), yPos, (pageWidth - 40) / 2, 25);
+
+                doc.setFontSize(20);
+                doc.setTextColor(0, 0, 0);
+                doc.text(fieldMonitorings.length.toString(), 25, yPos + 15);
+                doc.text(fieldSummariesCount.toString(), 30 + ((pageWidth - 40) / 2), yPos + 15);
+
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text("Muestreos de Plagas", 25, yPos + 22);
+                doc.text("Recorridas / Cierres de Lote", 30 + ((pageWidth - 40) / 2), yPos + 22);
+
+                yPos += 35;
+            }
+
+            doc.save(`Informe_Situacion_${new Date().toISOString().split('T')[0]}.pdf`);
+            showNotification("Informe Generado Exitosamente", "success");
+
+        } catch (error) {
+            console.error(error);
+            showNotification("Error al generar informe", "error");
+        } finally {
+            // Restore State
+            setSelectedCompanyId(originalCompanyId);
+            setSelectedFieldId(originalFieldId);
+            setMapColorMode(originalMapMode);
+            setIsGeneratingReport(false);
+            setGenerationProgress('');
         }
-
-        const engineerNotes: string[] = [];
-        filteredSummaries.forEach(s => {
-            const plotName = data.plots.find(p => p.id === s.plotId)?.name || 'Lote';
-            if (s.engineerNotes || (s.engineerStatus || s.status) === 'rojo') {
-                const status = s.engineerStatus || s.status;
-                const note = s.engineerNotes ? `Nota Ingeniero: "${s.engineerNotes}"` : "Sin nota específica del ingeniero.";
-                engineerNotes.push(`Lote ${plotName} (${status.toUpperCase()}): ${note}`);
-            }
-        });
-
-        const context = {
-            totalSummaries: filteredSummaries.length,
-            statusCounts: { verde: 0, amarillo: 0, rojo: 0 },
-            topPests: topPests.map(p => ({ name: p, count: 0 })),
-            allNotes: engineerNotes
-        };
-
-        const report = await AI.generateDashboardAnalysis(context, scope);
-        setEditableReport(report);
-        setIsAnalyzing(false);
-        setShowAiModal(true);
     };
 
     const handleExportExcel = () => {
@@ -926,9 +1238,12 @@ export const DashboardView: React.FC = () => {
                     <Button variant="secondary" onClick={handleExportExcel} className="w-full sm:w-auto text-xs font-bold" disabled={filteredSummaries.length === 0}>
                         <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> EXCEL
                     </Button>
-                    <Button onClick={handleAnalyze} disabled={isAnalyzing || filteredSummaries.length === 0} className="bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/30 shadow-lg border-none w-full sm:w-auto">
-                        {isAnalyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BrainCircuit className="w-4 h-4 mr-2" />}
-                        {isAnalyzing ? 'Analizando...' : getScopeLabel()}
+                    <Button
+                        onClick={() => setIsReportWizardOpen(true)}
+                        variant="secondary"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 border-none transition-all"
+                    >
+                        <FileDown className="w-4 h-4" /> Generar Informe
                     </Button>
                 </div>
             </div>
@@ -1047,7 +1362,7 @@ export const DashboardView: React.FC = () => {
             </div>
 
             {/* --- SECTION 1: CHARTS (Graphs, Heatmap, Budget) --- */}
-            <div style={{ display: (visualMode === 'charts' || isExporting) ? 'block' : 'none' }}>
+            <div style={{ display: (visualMode === 'charts' || isExporting || isGeneratingReport) ? 'block' : 'none' }}>
                 <ChartsSection
                     ref={chartsContainerRef}
                     healthHistory={healthHistoryData}
@@ -1297,6 +1612,26 @@ export const DashboardView: React.FC = () => {
                     setTracks(prev => prev.filter(t => t.id !== deletedId));
                 }}
             />
+            {/* NEW REPORT WIZARD */}
+            <ReportWizardModal
+                isOpen={isReportWizardOpen}
+                onClose={() => setIsReportWizardOpen(false)}
+                onStartGeneration={handleStartReportGeneration}
+                preSelectedCompanyId={effectiveCompanyId}
+            />
+
+            {/* GENERATION OVERLAY */}
+            {isGeneratingReport && (
+                <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                    <Loader2 className="w-16 h-16 animate-spin text-green-500 mb-6" />
+                    <h2 className="text-2xl font-bold mb-2">Generando Informe Profesional</h2>
+                    <p className="text-gray-300 animate-pulse">{generationProgress}</p>
+                    <div className="mt-8 text-xs text-gray-500 max-w-md text-center">
+                        Por favor, no cierre esta ventana ni cambie de pestaña.
+                        Estamos recorriendo sus campos para capturar imágenes de alta resolución.
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -356,7 +356,7 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                                             onClick={() => handleOpenExecutionModal(recipe, pid)}
                                                             className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors shadow-sm self-center"
                                                         >
-                                                            Marcar HECHO
+                                                            VER RECETA
                                                         </button>
                                                     )}
                                                 </div>
@@ -428,7 +428,7 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
-                                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
                                         value={actualHectares}
                                         onChange={(e) => setActualHectares(parseFloat(e.target.value) || 0)}
                                     />
@@ -447,7 +447,7 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                         <div className="w-20">
                                             <input
                                                 type="number"
-                                                className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs text-right"
+                                                className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs text-right dark:bg-gray-700 dark:text-white"
                                                 value={item.dose}
                                                 onChange={(e) => {
                                                     const val = parseFloat(e.target.value) || 0;
@@ -491,7 +491,7 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                                     <span className="text-xs text-gray-400">$</span>
                                                     <input
                                                         type="number"
-                                                        className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs text-right"
+                                                        className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs text-right dark:bg-gray-700 dark:text-white"
                                                         value={cost}
                                                         onChange={(e) => {
                                                             const val = parseFloat(e.target.value) || 0;
