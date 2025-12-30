@@ -44,6 +44,9 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
     const { isRecording, audioBlobUrl, audioDuration, toggleRecording, resetRecording } = useMediaRecorder();
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
 
+    // Delete State
+    const [recipeToDelete, setRecipeToDelete] = useState<string | null>(null);
+
     // Helpers
     const availableFields = data.fields.filter(f => !selectedCompanyId || f.companyId === selectedCompanyId);
 
@@ -143,6 +146,18 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
         }
     };
 
+    const handleDelete = async () => {
+        if (!recipeToDelete) return;
+        try {
+            await Storage.deletePrescription(recipeToDelete);
+            showNotification("Receta eliminada correctamente", "success");
+            setRecipeToDelete(null);
+        } catch (error) {
+            console.error(error);
+            showNotification("Error al eliminar la receta", "error");
+        }
+    };
+
     return (
         <div className="animate-fade-in pb-20">
             {/* Header */}
@@ -203,9 +218,18 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                                             {data.fields.find(f => f.id === recipe.fieldId)?.name || 'Campo'}
                                         </span>
                                     </div>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusFilter === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                        {statusFilter === 'pending' ? 'PENDIENTE' : 'EJECUTADA'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusFilter === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                            {statusFilter === 'pending' ? 'PENDIENTE' : 'EJECUTADA'}
+                                        </span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setRecipeToDelete(recipe.id); }}
+                                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Eliminar Receta"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                                 <h3 className="font-bold text-gray-800 dark:text-gray-100 line-clamp-2 mb-1">
                                     {recipe.items.map(i => i.supplyName).join(', ')}
@@ -527,6 +551,24 @@ export const ExecutionMode: React.FC<ExecutionModeProps> = ({ onBack, forcedComp
                     </div>
                 </Modal>
             )}
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={!!recipeToDelete}
+                onClose={() => setRecipeToDelete(null)}
+                title="Eliminar Receta"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3 text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50">
+                        <AlertTriangle className="w-6 h-6 shrink-0" />
+                        <p className="text-sm">¿Estás seguro de que deseas eliminar esta receta? Esta acción no se puede deshacer y perderás todo el historial asociado.</p>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setRecipeToDelete(null)}>Cancelar</Button>
+                        <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">Eliminar</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
