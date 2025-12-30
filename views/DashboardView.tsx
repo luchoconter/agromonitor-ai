@@ -2,10 +2,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
-import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History, Cloud, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History, Cloud, ChevronDown, ChevronUp, FlaskConical, List, Pause, Play } from 'lucide-react';
+import { Prescription } from '../types';
 import { LotSummary } from '../types';
 import { TrackSession } from '../types/tracking';
 import { Button, Modal, Select } from '../components/UI';
+import { getUserRole, getRoleColorClass } from '../utils/roleUtils';
 import * as Storage from '../services/storageService';
 import * as AI from '../services/geminiService';
 import * as Export from '../services/exportService';
@@ -29,7 +31,7 @@ import { BudgetSection } from '../components/dashboard/BudgetSection';
 import { HeatmapSection } from '../components/dashboard/HeatmapSection';
 
 export const DashboardView: React.FC = () => {
-    const { data, userCompanies } = useData();
+    const { data, userCompanies, dataOwnerId } = useData();
     const { setView, setSelection, showNotification } = useUI();
     const { currentUser } = useAuth();
 
@@ -79,7 +81,45 @@ export const DashboardView: React.FC = () => {
     const [historyPlotId, setHistoryPlotId] = useState<string | null>(null);
 
     // NEW: Tracks State
+    // NEW: Tracks State
     const [tracks, setTracks] = useState<TrackSession[]>([]);
+
+    // PRESCRIPTION MODAL STATE (Lifted from LotSituationTable)
+    const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+    const [pendingRecipesList, setPendingRecipesList] = useState<Prescription[] | null>(null);
+    const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+
+    const toggleAudio = (url: string, id: string) => {
+        if (playingAudioId === id) {
+            setPlayingAudioId(null);
+            const audio = document.getElementById(`audio-${id}`) as HTMLAudioElement;
+            if (audio) audio.pause();
+        } else {
+            setPlayingAudioId(id);
+            const audio = document.getElementById(`audio-${id}`) as HTMLAudioElement;
+            if (audio) { audio.play().catch(console.error); audio.onended = () => setPlayingAudioId(null); }
+        }
+    };
+
+    const handleOpenPlotPrescriptions = (plotId: string) => {
+        const plotPrescriptions = data.prescriptions
+            .filter(p => p.plotIds.includes(plotId) && p.status === 'active')
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        const pending = plotPrescriptions.filter(p => !p.executionData?.[plotId]?.executed);
+
+        if (pending.length > 1) {
+            setPendingRecipesList(pending);
+        } else if (pending.length === 1) {
+            setSelectedPrescription(pending[0]);
+        }
+    };
+
+    const formatDate = (iso: string | number) => {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
 
     const { isRecording, audioBlobUrl, audioDuration, toggleRecording, resetRecording } = useMediaRecorder();
 
@@ -1023,28 +1063,29 @@ export const DashboardView: React.FC = () => {
             {/* 3. MAP SECTION */}
             <div ref={mapContainerRef} style={{ display: (visualMode === 'map' || isExporting) ? 'block' : 'none' }}>
                 <MapSection
-                    ref={mapContainerRef}
-                    monitorings={filteredMonitorings}
                     plots={filteredPlotsForTable}
                     fields={data.fields}
-                    groups={data.plotGroups}
-                    mapColorMode={mapColorMode}
-                    isVisible={visualMode === 'map' || isExporting}
-                    selectedPestForMap={selectedMapPest}
+                    companies={userCompanies}
                     summaries={filteredSummaries}
+                    monitorings={filteredMonitorings}
+                    prescriptions={data.prescriptions} // Pass prescriptions
+                    mapColorMode={mapColorMode}
+                    selectedPestForMap={selectedMapPest}
+                    onPestChange={setSelectedMapPest}
+                    availablePests={availablePestsForMap}
+                    currentUser={currentUser}
+                    tracks={showTracksOverlay ? filteredTracksForMap : []}
+                    onOpenHistory={(plotId) => {
+                        setHistoryPlotId(plotId);
+                    }}
+                    onOpenPrescriptions={handleOpenPlotPrescriptions}
                     assignments={data.assignments}
                     crops={data.crops}
                     seasonId={selectedSeasonId}
-                    isExporting={isExporting}
                     onSelectSummary={setSelectedSummary}
-                    showHistory={showMapHistory}
-                    tracks={filteredTracksForMap}
-                    showTracks={showTracksOverlay}
-                    onOpenHistory={(pid) => {
-                        setHistoryPlotId(pid);
-                    }}
-                />
-            </div>
+                    isVisible={visualMode === 'map' || isExporting}
+                    isExporting={isExporting}
+                />        </div>
 
 
             {/* --- SECTION 3: LIST (Table) --- */}
@@ -1066,12 +1107,12 @@ export const DashboardView: React.FC = () => {
                         showCompanyCol={!effectiveCompanyId}
                         showFieldCol={!selectedFieldId}
                         currentUser={currentUser}
-                        onOpenHistory={setHistoryPlotId}
+                        onOpenHistory={(pid) => setHistoryPlotId(pid)}
                         seasonId={selectedSeasonId}
                         sortConfig={sortConfig}
                         onSort={handleSort}
-                    />
-                </div>
+                        onOpenPrescriptions={handleOpenPlotPrescriptions}
+                    />            </div>
             </div>
 
             <LotStatusModal
@@ -1121,6 +1162,102 @@ export const DashboardView: React.FC = () => {
                     data={data}
                 />
             )}
+
+            {/* --- MODALES DE RECETAS (Lifted from LotSituationTable) --- */}
+            {/* --- POPUP: DETALLE DE RECETA --- */}
+            <Modal isOpen={!!selectedPrescription} onClose={() => setSelectedPrescription(null)} title="Receta Agronómica Activa">
+                {selectedPrescription && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm text-gray-500 border-b border-gray-100 dark:border-gray-700 pb-2">
+                            <span>{formatDate(selectedPrescription.date)}</span>
+                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Activa</span>
+                        </div>
+
+                        <div>
+                            <h4 className="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                <FlaskConical className="w-4 h-4 mr-2" /> Insumos
+                            </h4>
+                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-100 dark:bg-gray-700/50 text-xs text-gray-500">
+                                        <tr><th className="px-3 py-2 text-left">Producto</th><th className="px-3 py-2 text-right">Dosis</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                        {selectedPrescription.items.map((it, i) => (
+                                            <tr key={i}>
+                                                <td className="px-3 py-2 dark:text-gray-200">{it.supplyName}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-gray-600 dark:text-gray-400">{it.dose} {it.unit}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {selectedPrescription.taskNames.length > 0 && (
+                            <div>
+                                <h4 className="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                    <List className="w-4 h-4 mr-2" /> Labores
+                                </h4>
+                                <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {selectedPrescription.taskNames.map((t, i) => <li key={i}>{t}</li>)}
+                                </ul>
+                            </div>
+                        )}
+
+                        {selectedPrescription.notes && (
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Indicaciones</h4>
+                                <p className={`text-sm italic p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-lg ${getRoleColorClass(getUserRole(selectedPrescription.ownerId, data.users, dataOwnerId))}`}>
+                                    {selectedPrescription.notes}
+                                </p>
+                            </div>
+                        )}
+
+                        {selectedPrescription.audioUrl && (
+                            <button onClick={() => toggleAudio(selectedPrescription.audioUrl!, 'recipe-audio')} className="w-full flex items-center justify-center p-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium">
+                                {playingAudioId === 'recipe-audio' ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                                Escuchar Nota de Voz
+                                <audio id="audio-recipe-audio" src={selectedPrescription.audioUrl} className="hidden" />
+                            </button>
+                        )}
+
+                        <div className="flex justify-end pt-2">
+                            <Button variant="ghost" onClick={() => setSelectedPrescription(null)}>Cerrar</Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* --- SELECCIÓN DE MÚLTIPLES RECETAS PENDIENTES --- */}
+            <Modal isOpen={!!pendingRecipesList} onClose={() => setPendingRecipesList(null)} title="Recetas Pendientes">
+                <div className="space-y-3">
+                    {pendingRecipesList && pendingRecipesList.length > 0 ? (
+                        pendingRecipesList.map(recipe => (
+                            <div key={recipe.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer" onClick={() => { setSelectedPrescription(recipe); setPendingRecipesList(null); }}>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{formatDate(recipe.createdAt)}</span>
+                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Pendiente</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="font-medium text-gray-700 dark:text-gray-300 block mb-0.5">Por: {recipe.ownerName || 'Desconocido'}</span>
+                                        {recipe.items.length} Insumos • {recipe.taskNames.length > 0 ? `${recipe.taskNames.length} Labores` : 'Solo productos'}
+                                    </div>
+                                </div>
+                                <Button size="sm" onClick={(e) => { e.stopPropagation(); setSelectedPrescription(recipe); setPendingRecipesList(null); }}>
+                                    Ver Detalle
+                                </Button>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-gray-500 italic">No hay recetas pendientes.</p>
+                    )}
+                </div>
+                <div className="flex justify-end mt-4">
+                    <Button variant="ghost" onClick={() => setPendingRecipesList(null)}>Cerrar</Button>
+                </div>
+            </Modal>
         </div>
     );
 };

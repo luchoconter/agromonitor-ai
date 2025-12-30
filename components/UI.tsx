@@ -189,12 +189,12 @@ interface ModalProps {
   zIndex?: number;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, zIndex = 50 }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, zIndex = 110000 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex }}>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 transition-all duration-200" style={{ zIndex }}>
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col relative">
         <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 shrink-0">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">

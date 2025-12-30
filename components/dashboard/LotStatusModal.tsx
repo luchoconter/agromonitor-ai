@@ -57,6 +57,7 @@ export const LotStatusModal: React.FC<LotStatusModalProps> = ({
                     summary.id,
                     feedbackStatus,
                     feedbackNotes,
+                    currentUser?.name || 'Ingeniero',
                     audioBlobUrl || undefined,
                     audioDuration
                 );
@@ -67,6 +68,8 @@ export const LotStatusModal: React.FC<LotStatusModalProps> = ({
                     status: feedbackStatus,
                     engineerStatus: feedbackStatus,
                     engineerNotes: feedbackNotes,
+                    engineerName: currentUser?.name || 'Ingeniero',
+                    engineerStatusDate: new Date().toISOString(),
                     engineerAudioDuration: audioDuration,
                     isReviewed: true,
                     userName: currentUser.name,

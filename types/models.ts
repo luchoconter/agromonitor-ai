@@ -258,4 +258,6 @@ export interface LotSummary {
   engineerNotes?: string;
   engineerAudioUrl?: string;
   engineerAudioDuration?: number;
+  engineerStatusDate?: string; // Nuevo: fecha de actualización del estado por ingeniero
+  engineerName?: string; // Nuevo: nombre del ingeniero que actualizó
 }

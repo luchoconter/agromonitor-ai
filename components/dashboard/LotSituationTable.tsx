@@ -21,6 +21,7 @@ interface LotSituationTableProps {
     seasonId?: string; // Optional context for budget calc
     sortConfig?: { key: 'date' | 'status' | 'name', direction: 'asc' | 'desc' };
     onSort?: (key: 'date' | 'status' | 'name') => void;
+    onOpenPrescriptions: (plotId: string) => void;
 }
 
 export const LotSituationTable: React.FC<LotSituationTableProps> = ({
@@ -35,12 +36,13 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
 
     seasonId,
     sortConfig,
-    onSort
+    onSort,
+    onOpenPrescriptions
 }) => {
     const { dataOwnerId } = useData();
     // --- STATE ---
     const [selectedSummary, setSelectedSummary] = useState<LotSummary | null>(null);
-    const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+    // Prescriptions handled by parent now
 
     // State for View Samples Modal
     const [viewSamplesSummary, setViewSamplesSummary] = useState<LotSummary | null>(null);
@@ -63,8 +65,7 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
         audioUrl?: string; // NEW: Audio feedback
     } | null>(null);
 
-    // Multiple Recipes Selection State
-    const [pendingRecipesList, setPendingRecipesList] = useState<Prescription[] | null>(null);
+    // Multiple Recipes Selection State handled by parent
 
     // --- ENGINEER FEEDBACK STATE ---
     const { isRecording, audioBlobUrl, audioDuration, toggleRecording, resetRecording } = useMediaRecorder();
@@ -116,6 +117,7 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                     selectedSummary.id,
                     feedbackStatus,
                     feedbackNotes,
+                    currentUser?.name || 'Ingeniero',
                     audioBlobUrl || undefined,
                     audioDuration
                 );
@@ -125,6 +127,8 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                     status: feedbackStatus,
                     engineerStatus: feedbackStatus,
                     engineerNotes: feedbackNotes,
+                    engineerName: currentUser?.name || 'Ingeniero',
+                    engineerStatusDate: new Date().toISOString(),
                     engineerAudioDuration: audioDuration,
                     isReviewed: true,
                     userName: currentUser.name,
@@ -385,11 +389,7 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                                         {activePrescription ? (
                                             <button
                                                 onClick={() => {
-                                                    if (pendingCount > 1) {
-                                                        setPendingRecipesList(pendingPrescriptions);
-                                                    } else {
-                                                        setSelectedPrescription(activePrescription);
-                                                    }
+                                                    onOpenPrescriptions(plot.id);
                                                 }}
                                                 className="relative p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors mx-auto"
                                                 title={pendingCount > 1 ? "Ver lista de recetas pendientes" : "Ver Receta Pendiente"}
@@ -651,71 +651,6 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                 </div>
             </Modal>
 
-            {/* --- POPUP: DETALLE DE RECETA --- */}
-            <Modal isOpen={!!selectedPrescription} onClose={() => setSelectedPrescription(null)} title="Receta Agronómica Activa">
-                {selectedPrescription && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center text-sm text-gray-500 border-b border-gray-100 dark:border-gray-700 pb-2">
-                            <span>{formatDate(selectedPrescription.date)}</span>
-                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold uppercase">Activa</span>
-                        </div>
-
-                        <div>
-                            <h4 className="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                                <FlaskConical className="w-4 h-4 mr-2" /> Insumos
-                            </h4>
-                            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-100 dark:bg-gray-700/50 text-xs text-gray-500">
-                                        <tr><th className="px-3 py-2 text-left">Producto</th><th className="px-3 py-2 text-right">Dosis</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                        {selectedPrescription.items.map((it, i) => (
-                                            <tr key={i}>
-                                                <td className="px-3 py-2 dark:text-gray-200">{it.supplyName}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-gray-600 dark:text-gray-400">{it.dose} {it.unit}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {selectedPrescription.taskNames.length > 0 && (
-                            <div>
-                                <h4 className="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                                    <List className="w-4 h-4 mr-2" /> Labores
-                                </h4>
-                                <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                                    {selectedPrescription.taskNames.map((t, i) => <li key={i}>{t}</li>)}
-                                </ul>
-                            </div>
-                        )}
-
-                        {selectedPrescription.notes && (
-                            <div>
-                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Indicaciones</h4>
-                                <p className={`text-sm italic p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-lg ${getRoleColorClass(getUserRole(selectedPrescription.ownerId, data.users, dataOwnerId))}`}>
-                                    {selectedPrescription.notes}
-                                </p>
-                            </div>
-                        )}
-
-                        {selectedPrescription.audioUrl && (
-                            <button onClick={() => toggleAudio(selectedPrescription.audioUrl!, 'recipe-audio')} className="w-full flex items-center justify-center p-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium">
-                                {playingAudioId === 'recipe-audio' ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                                Escuchar Nota de Voz
-                                <audio id="audio-recipe-audio" src={selectedPrescription.audioUrl} className="hidden" />
-                            </button>
-                        )}
-
-                        <div className="flex justify-end pt-2">
-                            <Button variant="ghost" onClick={() => setSelectedPrescription(null)}>Cerrar</Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
             {/* --- IMAGE PREVIEW MODAL --- */}
             <Modal isOpen={!!previewImage} onClose={() => setPreviewImage(null)} title="Previsualización">
                 <div className="flex justify-center items-center bg-black/5 rounded-lg overflow-hidden min-h-[200px]">
@@ -777,35 +712,6 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                     </div>
                 </div>
             </Modal >
-            {/* --- SELECCIÓN DE MÚLTIPLES RECETAS PENDIENTES --- */}
-            <Modal isOpen={!!pendingRecipesList} onClose={() => setPendingRecipesList(null)} title="Recetas Pendientes">
-                <div className="space-y-3">
-                    {pendingRecipesList && pendingRecipesList.length > 0 ? (
-                        pendingRecipesList.map(recipe => (
-                            <div key={recipe.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer" onClick={() => { setSelectedPrescription(recipe); setPendingRecipesList(null); }}>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{formatDate(recipe.createdAt)}</span>
-                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Pendiente</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        <span className="font-medium text-gray-700 dark:text-gray-300 block mb-0.5">Por: {recipe.ownerName || 'Desconocido'}</span>
-                                        {recipe.items.length} Insumos • {recipe.taskNames.length > 0 ? `${recipe.taskNames.length} Labores` : 'Solo productos'}
-                                    </div>
-                                </div>
-                                <Button size="sm" onClick={(e) => { e.stopPropagation(); setSelectedPrescription(recipe); setPendingRecipesList(null); }}>
-                                    Ver Detalle
-                                </Button>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-center text-gray-500 text-sm">No hay recetas pendientes.</p>
-                    )}
-                    <div className="flex justify-end pt-2">
-                        <Button variant="ghost" onClick={() => setPendingRecipesList(null)}>Cerrar</Button>
-                    </div>
-                </div>
-            </Modal>
         </>
     );
 };

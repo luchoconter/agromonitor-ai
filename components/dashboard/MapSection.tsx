@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MonitoringRecord, Plot, LotSummary, PlotAssignment, Crop, Field } from '../../types';
+import { MonitoringRecord, Plot, LotSummary, PlotAssignment, Crop, Field, Prescription } from '../../types';
 import { TrackSession } from '../../types/tracking';
 import { calculateDistance } from '../../services/trackingService';
 import { Layers, Maximize2, Minimize2, Circle as CircleIcon, Square, BookOpen } from 'lucide-react';
@@ -23,6 +23,8 @@ interface MapSectionProps {
     tracks?: TrackSession[];
     showTracks?: boolean; // New prop for overlay
     onOpenHistory?: (plotId: string) => void;
+    prescriptions?: Prescription[];
+    onOpenPrescriptions?: (plotId: string) => void;
 }
 
 const DATE_COLORS = [
@@ -57,7 +59,9 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
     seasonId = '',
     tracks = [],
     showTracks = false,
-    onOpenHistory
+    onOpenHistory,
+    prescriptions = [],
+    onOpenPrescriptions
 }, ref) => {
     const { data } = useData();
     // Use consistent violet for tracks to match legend (and avoid confusion with Status Red/Green)
@@ -173,7 +177,7 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
             const timeout = isExporting ? 0 : 200;
             setTimeout(() => mapInstanceRef.current.invalidateSize(), timeout);
         }
-    }, [isVisible, isExporting]);
+    }, [isVisible, isExporting, isMaximized]);
 
     useEffect(() => {
         const L = (window as any).L;
@@ -211,22 +215,75 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
             });
 
             plots.forEach((plot) => {
-                if (!plot || plot.lat === undefined || plot.lng === undefined) return;
+                if (!plot) return;
                 const plotId = plot.id;
+                const plotSummaries = summaries.filter(s => s.plotId === plotId);
 
-                // We use specific plot location, or fallback to monitoring location if strict plot location missing (though we check plot.lat above)
-                // actually we only use plot.lat/lng now as per requirement.
+                // --- CENTROID CALCULATION (Robust Fallback) ---
+                let centroid = { lat: plot.lat, lng: plot.lng };
 
-                // Logic to get status
-                // We can't rely on plotGroups loop anymore
+                // If plot has no coords, try to calculate from monitorings
+                if (centroid.lat === undefined || centroid.lng === undefined || centroid.lat === 0) {
+                    const plotMonitorings = monitorings.filter(m => m.plotId === plotId && m.location && m.location.lat && m.location.lng);
+                    if (plotMonitorings.length > 0) {
+                        const avgLat = plotMonitorings.reduce((sum, m) => sum + m.location!.lat, 0) / plotMonitorings.length;
+                        const avgLng = plotMonitorings.reduce((sum, m) => sum + m.location!.lng, 0) / plotMonitorings.length;
+                        centroid = { lat: avgLat, lng: avgLng };
+                    } else {
+                        // Last resort: skip if truly no location data
+                        return;
+                    }
+                }
 
                 const plotName = plot.name;
-                const centroid = { lat: plot.lat, lng: plot.lng };
 
-                const plotSummaries = summaries.filter(s => s.plotId === plotId);
-                plotSummaries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const latestSummary = plotSummaries[0];
-                const status = latestSummary ? (latestSummary.engineerStatus || latestSummary.status) : 'none';
+                // Nuevo: Lógica cronológica absoluta
+                // Cada resumen puede tener DOS eventos de estado:
+                // 1. Creación por operario (s.date)
+                // 2. Validación por ingeniero (s.engineerStatusDate o fallback a s.date + 1s)
+
+                interface StatusEvent {
+                    status: string;
+                    date: number;
+                    user: string;
+                    summary: LotSummary;
+                }
+                const events: StatusEvent[] = [];
+
+                plotSummaries.forEach(s => {
+                    // Evento Operario
+                    if (s.status) {
+                        events.push({
+                            status: s.status,
+                            date: new Date(s.date).getTime(),
+                            user: s.userName || 'Operario',
+                            summary: s
+                        });
+                    }
+                    // Evento Ingeniero
+                    if (s.engineerStatus) {
+                        // Si hay fecha explícita de ingeniero, usarla. Si no, asumir que fue posterior al operario (legacy)
+                        let d = s.engineerStatusDate ? new Date(s.engineerStatusDate).getTime() : new Date(s.date).getTime();
+                        if (!s.engineerStatusDate && s.status) d += 1000; // Tie-break a favor del ingeniero para datos viejos
+
+                        events.push({
+                            status: s.engineerStatus,
+                            date: d,
+                            user: s.engineerName || 'Ingeniero',
+                            summary: s
+                        });
+                    }
+                });
+
+                // Ordenar por fecha real del evento (el último gana)
+                events.sort((a, b) => b.date - a.date);
+
+                const latestEvent = events[0];
+                const status = latestEvent ? latestEvent.status : 'none';
+
+                // El latestSummary que se pasa al abrir el modal debe ser el que generó este estado
+                // O fallback al más reciente por fecha de creación si no hay eventos
+                const latestSummary = latestEvent ? latestEvent.summary : plotSummaries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
                 // --- CROP ICON LOGIC (Moved up for filtering) ---
                 let cropName = 'Sin Cultivo';
@@ -334,10 +391,25 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 }
 
                 const popupContent = document.createElement('div');
+                const dateStr = latestEvent ? new Date(latestEvent.date).toLocaleDateString() : '';
+                const userStr = latestEvent ? latestEvent.user : '';
+
                 popupContent.innerHTML = `
                     <div class="text-sm font-sans p-1 min-w-[150px]">
                         <strong class="block mb-2 text-gray-800 text-center border-b pb-1">${plotName}</strong>
+                        ${latestEvent ? `
+                            <div class="mb-2 text-center text-xs text-gray-600 bg-gray-50 p-1 rounded border border-gray-100">
+                                <div class="font-bold">${userStr}</div>
+                                <div class="text-[10px] text-gray-400">${dateStr}</div>
+                            </div>
+                        ` : ''}
                         <div class="flex flex-col gap-2">
+                             ${pendingCount > 0 ? `
+                                <button id="btn-recipes-${plotId}" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded w-full flex items-center justify-center gap-2 shadow-sm transition-colors">
+                                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                                   VER RECETAS (${pendingCount})
+                                </button>
+                             ` : ''}
                              <button id="btn-history-${plotId}" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded w-full flex items-center justify-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
                                 BITÁCORA
@@ -355,6 +427,15 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 marker.on('popupopen', () => {
                     const btnHistory = document.getElementById(`btn-history-${plotId}`);
                     const btnStatus = document.getElementById(`btn-status-${plotId}`);
+                    const btnRecipes = document.getElementById(`btn-recipes-${plotId}`);
+
+                    if (btnRecipes) {
+                        btnRecipes.onclick = (e) => {
+                            e.stopPropagation();
+                            if (onOpenPrescriptions) onOpenPrescriptions(plotId);
+                            // map.closePopup(); // Optional: close or keep open
+                        };
+                    }
 
                     if (btnHistory) {
                         btnHistory.onclick = (e) => {
@@ -381,7 +462,14 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 markers.push(marker);
             });
         } else if (mapColorMode === 'date') {
-            const validMonitorings = monitorings.filter(m => m.location && m.location.lat && m.location.lng);
+            const getMonitoringLocation = (m: MonitoringRecord) => {
+                if (m.location && m.location.lat && m.location.lng) return m.location;
+                const p = plots.find(p => p.id === m.plotId);
+                if (p && p.lat && p.lng) return { lat: p.lat, lng: p.lng };
+                return null;
+            };
+
+            const validMonitorings = monitorings.filter(m => getMonitoringLocation(m) !== null);
             validMonitorings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             const pointsToShow = showHistory
                 ? validMonitorings
@@ -395,12 +483,19 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                     routes.get(key)?.push(m);
                 });
                 routes.forEach((routePoints) => {
-                    const latlngs = routePoints.map(m => [m.location!.lat, m.location!.lng]);
-                    L.polyline(latlngs, { color: '#6b7280', weight: 2, opacity: 0.5, dashArray: '5, 5' }).addTo(map);
+                    const latlngs = routePoints.map(m => {
+                        const loc = getMonitoringLocation(m);
+                        return loc ? [loc.lat, loc.lng] : null;
+                    }).filter(x => x !== null) as [number, number][];
+                    if (latlngs.length > 0) {
+                        L.polyline(latlngs, { color: '#6b7280', weight: 2, opacity: 0.5, dashArray: '5, 5' }).addTo(map);
+                    }
                 });
             }
 
             pointsToShow.forEach(m => {
+                const loc = getMonitoringLocation(m);
+                if (!loc) return;
                 const plotName = plots.find(p => p.id === m.plotId)?.name || 'Lote';
                 let opacity = 1.0;
                 if (showHistory) {
@@ -411,19 +506,28 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 const color = '#3b82f6';
                 const markerHtml = `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
                 const customIcon = L.divIcon({ className: 'custom-map-marker', html: markerHtml, iconSize: [16, 16], iconAnchor: [8, 8] });
-                const marker = L.marker([m.location!.lat, m.location!.lng], { icon: customIcon, opacity })
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon, opacity })
                     .addTo(map)
                     .bindPopup(`<b>${plotName}</b><br/>${getShortDate(m.date)}<br/>${m.userName || ''}`);
                 markers.push(marker);
             });
         } else if (mapColorMode === 'pest') {
-            const validMonitorings = monitorings.filter(m => m.location && m.location.lat && m.location.lng);
+            const getMonitoringLocation = (m: MonitoringRecord) => {
+                if (m.location && m.location.lat && m.location.lng) return m.location;
+                const p = plots.find(p => p.id === m.plotId);
+                if (p && p.lat && p.lng) return { lat: p.lat, lng: p.lng };
+                return null;
+            };
+
+            const validMonitorings = monitorings.filter(m => getMonitoringLocation(m) !== null);
             validMonitorings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             const pointsToShow = showHistory
                 ? validMonitorings
                 : Array.from(validMonitorings.reduce((acc, curr) => acc.set(curr.plotId, curr), new Map()).values());
 
             pointsToShow.forEach(m => {
+                const loc = getMonitoringLocation(m);
+                if (!loc) return;
                 const plotName = plots.find(p => p.id === m.plotId)?.name || 'Lote';
                 let found = false;
                 let valNum = 0;
@@ -485,7 +589,7 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 const markerHtml = `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
                 const customIcon = L.divIcon({ className: 'custom-map-marker', html: markerHtml, iconSize: [18, 18], iconAnchor: [9, 9] });
                 const pestSummary = m.pestData?.map(p => `${p.name} (${p.value} ${p.unit})`).join(', ') || 'Sin plagas';
-                const marker = L.marker([m.location!.lat, m.location!.lng], { icon: customIcon, opacity, zIndexOffset: zIndex })
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon, opacity, zIndexOffset: zIndex })
                     .addTo(map)
                     .bindPopup(`<div class="text-sm font-sans"><strong class="block mb-1 text-gray-800">${plotName}</strong><span class="text-xs text-gray-500 block">Muestra #${m.sampleNumber || '?'}</span><span class="text-xs text-gray-500 block">${getShortDate(m.date)}</span><div class="mt-2 text-xs border-t border-gray-100 pt-1"><strong class="text-gray-700">Plagas:</strong> <span class="text-gray-600">${pestSummary}</span></div></div>`);
                 markers.push(marker);
