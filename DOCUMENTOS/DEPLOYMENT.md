@@ -241,3 +241,37 @@ Antes de cada deploy a producción:
 **Última versión desplegada:** 20/12/2025 - v2.18  
 **Estado:** ✅ PRODUCCIÓN ESTABLE CON OFFLINE COMPLETO
 **Próxima actualización programada:** TBD
+
+
+## 10. Despliegue de Pruebas con Canales de Preview (Firebase Hosting)
+
+Desde diciembre 2025, se recomienda utilizar canales de preview para probar nuevas versiones de la app sin afectar el entorno de producción ni a los usuarios activos.
+
+### ¿Qué es un canal de preview?
+Un canal de preview es una URL temporal e independiente generada por Firebase Hosting, donde puedes desplegar y validar cambios antes de publicarlos en producción. Ejemplo de URL: `https://<canal>--<proyecto>.web.app`
+
+### Ventajas
+- No interrumpe el uso de la app en producción
+- Permite compartir la URL de pruebas para feedback
+- Expira automáticamente (por defecto, 7 días), pero puedes renovarlo o crear uno nuevo
+
+### Comandos para crear un canal de preview
+1. Compila la app:
+   ```powershell
+   npm run build
+   ```
+2. Despliega en un canal de preview (ejemplo: "pruebas"):
+   ```powershell
+   firebase hosting:channel:deploy pruebas --project agromonitor-f959f
+   ```
+3. Accede a la URL generada y valida los cambios.
+
+### Consideraciones
+- La base de datos será la misma que producción, salvo que configures otro proyecto de Firebase.
+- Los canales de preview no reemplazan el despliegue principal.
+- Puedes eliminar el canal cuando termines:
+   ```powershell
+   firebase hosting:channel:delete pruebas --project agromonitor-f959f
+   ```
+
+Más información: [Firebase Hosting Preview Channels](https://firebase.google.com/docs/hosting/channel-management)
