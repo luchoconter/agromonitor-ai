@@ -328,7 +328,7 @@ export const HistoryView: React.FC = () => {
                     ) : filteredHistory.map(m => (
                         <div key={m.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 relative group">
                             <div className="flex justify-between items-start mb-1 border-b border-gray-100 dark:border-gray-700 pb-2 pr-16">
-                                <div className="font-bold text-gray-800 dark:text-gray-200 text-sm">M{m.sampleNumber} / {data.plots.find(p => p.id === m.plotId)?.name} / {data.companies.find(c => c.id === m.companyId)?.name}</div>
+                                <div className="font-bold text-gray-800 dark:text-gray-200 text-sm">M{m.sampleNumber} / {data.plots.find(p => p.id === m.plotId)?.name} / {data.fields.find(f => f.id === m.fieldId)?.name} / {data.companies.find(c => c.id === m.companyId)?.name}</div>
                                 <div className="text-right">
                                     <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{formatDate(m.date)}</div>
                                     <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 flex items-center justify-end"><User className="w-3 h-3 mr-1" /> {m.userName || 'Usuario'}</div>

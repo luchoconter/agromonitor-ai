@@ -23,6 +23,7 @@ import html2canvas from 'html2canvas';
 import { KPISection } from '../components/dashboard/KPISection';
 import { ChartsSection } from '../components/dashboard/ChartsSection';
 import { MapSection } from '../components/dashboard/MapSection';
+import { TrackListModal } from '../components/dashboard/TrackListModal';
 import { WeatherWidget } from '../components/weather/WeatherWidget';
 import { LotSituationTable } from '../components/dashboard/LotSituationTable';
 import { LotHistoryModal } from '../components/dashboard/LotHistoryModal';
@@ -81,8 +82,8 @@ export const DashboardView: React.FC = () => {
     const [historyPlotId, setHistoryPlotId] = useState<string | null>(null);
 
     // NEW: Tracks State
-    // NEW: Tracks State
     const [tracks, setTracks] = useState<TrackSession[]>([]);
+    const [showTrackList, setShowTrackList] = useState(false);
 
     // PRESCRIPTION MODAL STATE (Lifted from LotSituationTable)
     const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
@@ -987,12 +988,21 @@ export const DashboardView: React.FC = () => {
 
                         {/* TRACKS TOGGLE (Only in Status Mode) */}
                         {mapColorMode === 'status' && (
-                            <button
-                                onClick={() => setShowTracksOverlay(!showTracksOverlay)}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center border ${showTracksOverlay ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50'}`}
-                            >
-                                <History className="w-3 h-3 mr-1.5" /> {showTracksOverlay ? 'Ocultar Recorridos' : 'Mostrar Recorridos'}
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => setShowTracksOverlay(!showTracksOverlay)}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center border ${showTracksOverlay ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50'}`}
+                                >
+                                    <History className="w-3 h-3 mr-1.5" /> {showTracksOverlay ? 'Ocultar Recorridos' : 'Mostrar Recorridos'}
+                                </button>
+                                <button
+                                    onClick={() => setShowTrackList(true)}
+                                    className="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center border bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    title="Ver Listado de Recorridos"
+                                >
+                                    <List className="w-3.5 h-3.5" />
+                                </button>
+                            </>
                         )}
 
                         {mapColorMode === 'pest' && (
@@ -1094,6 +1104,24 @@ export const DashboardView: React.FC = () => {
                     <div className="flex-1 relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input type="text" placeholder="Buscar lote..." className="w-full pl-10 pr-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-sm focus:ring-2 focus:ring-agro-500 outline-none text-gray-800 dark:text-white transition-all h-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div className="w-full sm:w-64">
+                        <Select
+                            label=""
+                            options={[
+                                { value: 'date_desc', label: '📅 Más Recientes' },
+                                { value: 'date_asc', label: '📅 Más Antiguos' },
+                                { value: 'status_desc', label: '⚠️ Prioridad (Rojo → Verde)' },
+                                { value: 'status_asc', label: '✅ Estado (Verde → Rojo)' },
+                            ]}
+                            value={`${sortConfig.key}_${sortConfig.direction}`}
+                            onChange={(e) => {
+                                const [key, direction] = e.target.value.split('_');
+                                setSortConfig({ key: key as any, direction: direction as any });
+                            }}
+                            className="text-xs h-10"
+                            placeholder="Ordenar por..."
+                        />
                     </div>
                 </div>
 
@@ -1258,6 +1286,17 @@ export const DashboardView: React.FC = () => {
                     <Button variant="ghost" onClick={() => setPendingRecipesList(null)}>Cerrar</Button>
                 </div>
             </Modal>
+            {/* NEW: Track List Modal */}
+            <TrackListModal
+                isOpen={showTrackList}
+                onClose={() => setShowTrackList(false)}
+                tracks={tracks}
+                users={data.team}
+                fields={data.fields}
+                onTrackDeleted={(deletedId) => {
+                    setTracks(prev => prev.filter(t => t.id !== deletedId));
+                }}
+            />
         </div>
     );
 };

@@ -38,7 +38,8 @@ export type ViewState =
   | 'manage-agrochemicals'
   | 'manage-tasks'
   | 'manage-team'
-  | 'budget-manager';
+  | 'budget-manager'
+  | 'track-history';
 
 export interface SelectionState {
   companyId: string | null;

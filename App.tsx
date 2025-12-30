@@ -30,6 +30,7 @@ import { DashboardView } from './views/DashboardView';
 import { RecipesView } from './views/RecipesView';
 import { NotificationManager } from './components/NotificationManager';
 import { BudgetManager } from './components/finance/BudgetManager';
+import { TracksView } from './views/TracksView';
 
 // --- Main Inner App (Access to Contexts) ---
 const MainApp: React.FC = () => {
@@ -166,6 +167,10 @@ const MainApp: React.FC = () => {
         <div className="max-w-6xl mx-auto">
           <BudgetManager />
         </div>
+      )}
+
+      {view === 'track-history' && dataOwnerId && (
+        <TracksView />
       )}
     </Layout>
   );

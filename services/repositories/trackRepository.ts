@@ -8,7 +8,8 @@ import {
     where,
     orderBy,
     Timestamp,
-    getDoc
+    getDoc,
+    deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase'; // Adjust path if needed, assuming firebase config is here
 import { TrackSession } from '../../types/tracking';
@@ -51,7 +52,11 @@ export const getTracks = async (companyId?: string, userId?: string, dateFrom?: 
             endTime: data.endTime,
             points: data.points,
             distance: data.distance,
-            status: data.status
+            status: data.status,
+            name: data.name,
+            notes: data.notes,
+            companyId: data.companyId,
+            fieldIds: data.fieldIds
         } as TrackSession;
     });
 
@@ -60,6 +65,11 @@ export const getTracks = async (companyId?: string, userId?: string, dateFrom?: 
         const date = new Date(t.startTime);
         if (dateFrom && date < dateFrom) return false;
         if (dateTo && date > dateTo) return false;
+        if (companyId && t.companyId !== companyId) return false;
         return true;
     });
+};
+
+export const deleteTrack = async (trackId: string): Promise<void> => {
+    await deleteDoc(doc(db, TRACKS_COLLECTION, trackId));
 };

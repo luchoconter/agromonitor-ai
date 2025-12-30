@@ -19,7 +19,7 @@ interface TrackingContextType {
     startTracking: (companyId?: string, fieldIds?: string[]) => Promise<void>;
     pauseTracking: () => Promise<void>;
     resumeTracking: () => Promise<void>;
-    finishTracking: (save: boolean) => Promise<void>;
+    finishTracking: (save: boolean, name?: string, notes?: string) => Promise<void>;
     distanceTraveled: number;
     error: string | null;
 }
@@ -180,7 +180,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsPaused(false);
     };
 
-    const finishTracking = async (save: boolean) => {
+    const finishTracking = async (save: boolean, name?: string, notes?: string) => {
         await stopGpsWatch();
         setIsTracking(false);
         setIsPaused(false);
@@ -190,7 +190,9 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                 ...currentTrack,
                 endTime: new Date().toISOString(),
                 status: 'completed',
-                distance: distanceTraveled
+                distance: distanceTraveled,
+                name: name || undefined,
+                notes: notes || undefined
             };
 
             try {

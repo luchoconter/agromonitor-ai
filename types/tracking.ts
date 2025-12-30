@@ -19,4 +19,6 @@ export interface TrackSession {
     companyId?: string;
     fieldIds?: string[];
     synced?: boolean;
+    name?: string;
+    notes?: string;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings, ClipboardList, History, BarChart3, Users, LayoutList, Layers, Wheat, Bug, Sprout, Menu, X, LogOut, Sun, Moon, FlaskConical, ListTodo, FileText, Calendar, CloudOff, Cloud, RefreshCw, CheckCircle, AlertCircle, Loader2, Circle, StopCircle, Play, Save, Trash2, Wallet, Download
+  Settings, ClipboardList, History, BarChart3, Users, LayoutList, Layers, Wheat, Bug, Sprout, Menu, X, LogOut, Sun, Moon, FlaskConical, ListTodo, FileText, Calendar, CloudOff, Cloud, RefreshCw, CheckCircle, AlertCircle, Loader2, Circle, StopCircle, Play, Save, Trash2, Wallet, Download, Route
 } from 'lucide-react';
 import { ViewState } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,6 +34,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // New: PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // New: Track Metadata State
+  const [trackName, setTrackName] = useState('');
+  const [trackNotes, setTrackNotes] = useState('');
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -133,6 +138,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleStopClick = async () => {
     await pauseTracking();
+    setIsSavingDetails(false);
     setShowStopModal(true);
   };
 
@@ -142,8 +148,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const handleSave = async () => {
-    await finishTracking(true);
+    await finishTracking(true, trackName, trackNotes);
     setShowStopModal(false);
+    setTrackName('');
+    setTrackNotes('');
   };
 
   const handleDiscard = async () => {
@@ -213,6 +221,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {renderItem('recipes', 'Recetas', FileText)}
             {renderItem('analytics', 'Dashboard', BarChart3)}
             {renderItem('budget-manager', 'Presupuestos', Wallet)}
+            {renderItem('track-history', 'Recorridas', Route)}
           </>
         )}
 
@@ -260,21 +269,55 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Has recorrido <strong>{distanceTraveled.toFixed(2)} km</strong> en <strong>{formatTime(elapsedTime)}</strong>.<br />
                 ¿Qué deseas hacer?
               </p>
-              <div className="flex flex-col gap-3">
-                <button onClick={handleContinue} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-agro-600 hover:bg-agro-700 text-white rounded-lg font-semibold transition-colors">
-                  <Play className="w-5 h-5 fill-current" /> Continuar Tracking
-                </button>
-                <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
-                  <Save className="w-5 h-5" /> Guardar Recorrido
-                </button>
-                <button onClick={handleDiscard} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/30 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg font-semibold transition-colors">
-                  <Trash2 className="w-5 h-5" /> Descartar
-                </button>
-              </div>
+              {!isSavingDetails ? (
+                // STEP 1: OPTIONS
+                <div className="flex flex-col gap-3">
+                  <button onClick={handleContinue} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-agro-600 hover:bg-agro-700 text-white rounded-lg font-semibold transition-colors">
+                    <Play className="w-5 h-5 fill-current" /> Continuar Tracking
+                  </button>
+                  <button onClick={() => setIsSavingDetails(true)} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
+                    <Save className="w-5 h-5" /> Guardar Recorrido
+                  </button>
+                  <button onClick={handleDiscard} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/30 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg font-semibold transition-colors">
+                    <Trash2 className="w-5 h-5" /> Descartar
+                  </button>
+                </div>
+              ) : (
+                // STEP 2: DETAILS FORM
+                <div className="animate-fade-in">
+                  <div className="w-full mb-4 text-left">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre (Opcional)</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Recorrida Lote 5"
+                      value={trackName}
+                      onChange={(e) => setTrackName(e.target.value)}
+                      className="w-full text-base p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white mb-3"
+                      autoFocus
+                    />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Observaciones (Opcional)</label>
+                    <textarea
+                      placeholder="Escribe aquí si viste algo raro..."
+                      value={trackNotes}
+                      onChange={(e) => setTrackNotes(e.target.value)}
+                      className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none h-20"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setIsSavingDetails(false)} className="flex-1 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                      Volver
+                    </button>
+                    <button onClick={handleSave} className="flex-[2] py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
+                      <Save className="w-5 h-5" /> Confirmar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col shadow-sm z-10 hidden md:flex">
         <div className="p-6 flex items-center space-x-2 border-b border-gray-100 dark:border-gray-700">
@@ -284,35 +327,37 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {renderNavItems()}
       </aside>
 
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
-          <aside className="relative w-72 bg-white dark:bg-gray-800 h-full shadow-2xl flex flex-col animate-slide-in-left">
-            <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-700">
-              <div className="flex items-center space-x-2"><div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-5 h-5 text-white" /></div><span className="font-bold text-gray-800 dark:text-white">Ing Marcon</span></div>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X className="w-6 h-6" /></button>
-            </div>
-            {renderNavItems()}
-            <div className="p-4 border-t border-gray-100 dark:border-gray-700">
-              <div className="flex items-center space-x-3 mb-4 px-2">
-                <div className="w-8 h-8 rounded-full bg-agro-100 dark:bg-agro-900/50 flex items-center justify-center text-agro-700 dark:text-agro-400 font-bold">{currentUser.name.charAt(0)}</div>
-                <div className="flex flex-col"><span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate w-32">{currentUser.name}</span><span className="text-[10px] text-gray-500 dark:text-blue-300 capitalize">{currentUser.role}</span></div>
+      {
+        isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+            <aside className="relative w-72 bg-white dark:bg-gray-800 h-full shadow-2xl flex flex-col animate-slide-in-left">
+              <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center space-x-2"><div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-5 h-5 text-white" /></div><span className="font-bold text-gray-800 dark:text-white">Ing Marcon</span></div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X className="w-6 h-6" /></button>
               </div>
-              <button onClick={logout} className="w-full flex items-center justify-center px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"><LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión</button>
+              {renderNavItems()}
+              <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center space-x-3 mb-4 px-2">
+                  <div className="w-8 h-8 rounded-full bg-agro-100 dark:bg-agro-900/50 flex items-center justify-center text-agro-700 dark:text-agro-400 font-bold">{currentUser.name.charAt(0)}</div>
+                  <div className="flex flex-col"><span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate w-32">{currentUser.name}</span><span className="text-[10px] text-gray-500 dark:text-blue-300 capitalize">{currentUser.role}</span></div>
+                </div>
+                <button onClick={logout} className="w-full flex items-center justify-center px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"><LogOut className="w-4 h-4 mr-2" /> Cerrar Sesión</button>
 
-              {/* Mobile Install Button */}
-              {deferredPrompt && (
-                <button
-                  onClick={handleInstallClick}
-                  className="w-full flex items-center justify-center px-4 py-2 mt-2 bg-agro-600 text-white rounded-lg hover:bg-agro-700 transition-colors text-sm font-medium"
-                >
-                  <Download className="w-4 h-4 mr-2" /> Instalar Aplicación
-                </button>
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
+                {/* Mobile Install Button */}
+                {deferredPrompt && (
+                  <button
+                    onClick={handleInstallClick}
+                    className="w-full flex items-center justify-center px-4 py-2 mt-2 bg-agro-600 text-white rounded-lg hover:bg-agro-700 transition-colors text-sm font-medium"
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Instalar Aplicación
+                  </button>
+                )}
+              </div>
+            </aside>
+          </div>
+        )
+      }
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 md:px-8 shadow-sm shrink-0">
