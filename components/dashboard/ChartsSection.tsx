@@ -75,7 +75,7 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
 
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={healthHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={healthHistory} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
               <defs>
                 <linearGradient id="colorVerde" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8} />
@@ -90,27 +90,30 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} strokeWidth={1} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10, fill: textColor }}
+                tick={{ fontSize: 11, fill: textColor, fontWeight: 'bold' }}
                 tickLine={false}
-                axisLine={false}
+                axisLine={{ stroke: gridColor, strokeWidth: 1 }}
                 minTickGap={30}
+                label={{ value: 'Fecha', position: 'insideBottom', offset: -10, fill: textColor, fontSize: 11, fontWeight: 'bold' }}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: textColor }}
+                tick={{ fontSize: 11, fill: textColor, fontWeight: 'bold' }}
                 tickLine={false}
                 axisLine={false}
                 unit="%"
+                label={{ value: '% Lotes', angle: -90, position: 'insideLeft', fill: textColor, fontSize: 11, fontWeight: 'bold' }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: textColor, strokeWidth: 1 }} />
               <Area
                 type="monotone"
                 dataKey="rojo"
                 name="Peligro"
                 stackId="1"
                 stroke="#ef4444"
+                strokeWidth={2}
                 fill="url(#colorRojo)"
                 unit="%"
               />
@@ -120,6 +123,7 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
                 name="Alerta"
                 stackId="1"
                 stroke="#eab308"
+                strokeWidth={2}
                 fill="url(#colorAmarillo)"
                 unit="%"
               />
@@ -129,6 +133,7 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
                 name="Bien"
                 stackId="1"
                 stroke="#22c55e"
+                strokeWidth={2}
                 fill="url(#colorVerde)"
                 unit="%"
               />
@@ -147,23 +152,25 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
         {topPests.length > 0 ? (
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={pestHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+              <LineChart data={pestHistory} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} strokeWidth={1} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 10, fill: textColor }}
+                  tick={{ fontSize: 11, fill: textColor, fontWeight: 'bold' }}
                   tickLine={false}
-                  axisLine={false}
+                  axisLine={{ stroke: gridColor, strokeWidth: 1 }}
                   minTickGap={30}
+                  label={{ value: 'Fecha', position: 'insideBottom', offset: -10, fill: textColor, fontSize: 11, fontWeight: 'bold' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: textColor }}
+                  tick={{ fontSize: 11, fill: textColor, fontWeight: 'bold' }}
                   tickLine={false}
                   axisLine={false}
                   allowDecimals={false}
+                  label={{ value: 'Detecciones', angle: -90, position: 'insideLeft', fill: textColor, fontSize: 11, fontWeight: 'bold' }}
                 />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} iconType="circle" />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: textColor, strokeWidth: 1 }} />
+                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px', fontWeight: '500' }} iconType="circle" />
 
                 {topPests.map((pestName, index) => (
                   <Line
@@ -171,9 +178,9 @@ export const ChartsSection = forwardRef<HTMLDivElement, ChartsSectionProps>(({
                     type="monotone"
                     dataKey={pestName}
                     stroke={PEST_COLORS[index % PEST_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 6 }}
+                    strokeWidth={3}
+                    dot={{ r: 3, strokeWidth: 1 }}
+                    activeDot={{ r: 7 }}
                   />
                 ))}
               </LineChart>

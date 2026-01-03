@@ -58,6 +58,60 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         };
     }, [isTracking, isPaused]);
 
+    // --- RESTORE ACTIVE TRACK ON MOUNT ---
+    useEffect(() => {
+        const restoreSession = async () => {
+            if (!currentUser) return;
+            try {
+                const { getActiveTrack } = await import('../services/offlineTrackService');
+                const savedTrack = await getActiveTrack();
+                if (savedTrack && savedTrack.status === 'recording') {
+                    console.log("Found interrupted active track, restoring...");
+                    setCurrentTrack(savedTrack);
+                    setIsTracking(true);
+
+                    // Recalculate duration approx
+                    const start = new Date(savedTrack.startTime).getTime();
+                    const now = new Date().getTime();
+                    // We can't know exact 'moved' time vs 'paused' time if app died, 
+                    // but we can set it to (now - start) / 1000 or keep stored if we stored it (we didn't store elapsed).
+                    // Best effort: set to (now - start) / 1000 to show "Total Duration"
+                    setElapsedTime(Math.floor((now - start) / 1000));
+                    setDistanceTraveled(savedTrack.distance || 0);
+
+                    if (savedTrack.points.length > 0) {
+                        lastPointRef.current = savedTrack.points[savedTrack.points.length - 1];
+                    }
+
+                    // Auto-resume GPS if it was recording
+                    setIsPaused(false);
+                    startGpsWatch();
+                }
+            } catch (e) {
+                console.error("Error restoring track session", e);
+            }
+        };
+        restoreSession();
+    }, [currentUser]);
+
+    // --- WAKELOCK & VISIBILITY HANDLER ---
+    useEffect(() => {
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'visible' && isTracking && !isPaused) {
+                console.log("App foregrounded, ensuring WakeLock and GPS...");
+                await requestWakeLock();
+                // If watchId was lost? usually navigator.geolocation keeps it, but safe to check?
+                // For now just WakeLock is the most fragile part.
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isTracking, isPaused]);
+
+
     const startTracking = async (companyId?: string, fieldIds?: string[]) => {
         if (!currentUser) return;
 
@@ -94,6 +148,12 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         setCurrentTrack(newTrack);
         setIsTracking(true);
 
+        // Save immediately as active
+        try {
+            const { saveActiveTrack } = await import('../services/offlineTrackService');
+            await saveActiveTrack(newTrack);
+        } catch (e) { console.error("Could not save initial active track", e); }
+
         // Start GPS
         await startGpsWatch();
     };
@@ -102,13 +162,18 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         const ok = await requestWakeLock();
         if (!ok) console.warn("No se pudo activar WakeLock");
 
+        // Clear existing if any to avoid dupes
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+
         watchIdRef.current = navigator.geolocation.watchPosition(
-            (position) => {
+            async (position) => {
                 const { latitude, longitude, accuracy, speed, heading } = position.coords;
                 const timestamp = position.timestamp;
 
-                // Simple filter: accuracy must be better than 50m
-                if (accuracy > 50) return;
+                // Improved Filter: accuracy must be better than 40m (was 50)
+                if (accuracy > 40) return;
 
                 const newPoint: TrackPoint = {
                     lat: latitude,
@@ -119,8 +184,8 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                     heading
                 };
 
-                // OPTIMIZATION: Smart Distance Filter (10 meters) causes less points to be stored
-                // while maintaining map quality.
+                // OPTIMIZATION: Smart Distance Filter
+                // Dist min: 7 meters (was 10m). Better resolution for walking.
                 let shouldSave = false;
                 let dist = 0;
 
@@ -133,30 +198,49 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                         latitude,
                         longitude
                     );
-                    if (dist > 0.010) { // 10 meters min distance
+                    if (dist > 0.007) { // 7 meters min
                         shouldSave = true;
                     }
                 }
 
                 if (shouldSave) {
+                    let updatedTrack: TrackSession | null = null;
+
                     setCurrentTrack(prev => {
                         if (!prev) return null;
-                        return { ...prev, points: [...prev.points, newPoint] };
+                        const newPoints = [...prev.points, newPoint];
+                        const newDist = (prev.distance || 0) + dist;
+                        updatedTrack = {
+                            ...prev,
+                            points: newPoints,
+                            distance: newDist
+                        };
+                        return updatedTrack;
                     });
 
                     if (lastPointRef.current) {
                         setDistanceTraveled(prev => prev + dist);
                     }
                     lastPointRef.current = newPoint;
+
+                    // PERSIST ACTIVE TRACK CONTINUOUSLY
+                    if (updatedTrack) {
+                        const { saveActiveTrack } = await import('../services/offlineTrackService');
+                        saveActiveTrack(updatedTrack as TrackSession).catch(err => console.error("Error saving active track update", err));
+                    }
                 }
             },
             (err) => {
                 console.error(err);
-                setError(err.message);
+                // Don't kill tracking on minor timeout errors, just log
+                if (err.code === 1) { // Permission denied
+                    setError("Permiso de ubicación denegado.");
+                    setIsTracking(false);
+                }
             },
             {
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 20000, // relaxed timeout
                 maximumAge: 0
             }
         );
@@ -173,6 +257,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
     const pauseTracking = async () => {
         await stopGpsWatch();
         setIsPaused(true);
+        // We could also update status in DB to 'paused' if we wanted
     };
 
     const resumeTracking = async () => {
@@ -185,6 +270,8 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsTracking(false);
         setIsPaused(false);
 
+        const { saveTrackOffline, markTrackSynced, deleteActiveTrack } = await import('../services/offlineTrackService');
+
         if (save && currentTrack) {
             const finalTrack: TrackSession = {
                 ...currentTrack,
@@ -196,11 +283,13 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
             };
 
             try {
-                // 1. Save Offline FIRST (Critical for reliability)
-                const { saveTrackOffline, markTrackSynced } = await import('../services/offlineTrackService');
+                // 1. Save Offline Final
                 await saveTrackOffline(finalTrack);
 
-                // 2. Try Sync
+                // 2. Remove from "Active" store
+                await deleteActiveTrack(finalTrack.id);
+
+                // 3. Try Sync
                 if (navigator.onLine) {
                     try {
                         await saveTrack(finalTrack);
@@ -209,7 +298,6 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                         finalTrack.synced = true;
                     } catch (syncErr) {
                         console.warn("Sync failed, track saved offline", syncErr);
-                        // No error shown to user, it's safe offline
                     }
                 } else {
                     console.log("Offline mode: Track saved locally.");
@@ -219,6 +307,9 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                 console.error("Error saving track", e);
                 setError("Error al guardar el recorrido.");
             }
+        } else if (!save && currentTrack) {
+            // Discarding: also remove from active store
+            await deleteActiveTrack(currentTrack.id);
         }
 
         setCurrentTrack(null);

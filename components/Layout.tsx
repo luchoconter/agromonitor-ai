@@ -242,7 +242,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {renderItem('recipes', 'Recetas', FileText)}
             {renderItem('analytics', 'Dashboard', BarChart3)}
             {renderItem('budget-manager', 'Presupuestos', Wallet)}
-            {renderItem('track-history', 'Recorridas', Route)}
+            {renderItem('track-history', 'Rutas GPS', Route)}
           </>
         )}
 
@@ -293,7 +293,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="bg-amber-100 dark:bg-amber-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <StopCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Recorrido Pausado</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Ruta Pausada</h3>
               <p className="text-gray-500 dark:text-blue-300 mb-6">
                 Has recorrido <strong>{distanceTraveled.toFixed(2)} km</strong> en <strong>{formatTime(elapsedTime)}</strong>.<br />
                 ¿Qué deseas hacer?
@@ -305,7 +305,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Play className="w-5 h-5 fill-current" /> Continuar Tracking
                   </button>
                   <button onClick={() => setIsSavingDetails(true)} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
-                    <Save className="w-5 h-5" /> Guardar Recorrido
+                    <Save className="w-5 h-5" /> Guardar Ruta
                   </button>
                   <button onClick={handleDiscard} className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/30 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg font-semibold transition-colors">
                     <Trash2 className="w-5 h-5" /> Descartar
@@ -318,7 +318,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre (Opcional)</label>
                     <input
                       type="text"
-                      placeholder="Ej: Recorrida Lote 5"
+                      placeholder="Ej: Ruta Lote 5"
                       value={trackName}
                       onChange={(e) => setTrackName(e.target.value)}
                       className="w-full text-base p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white mb-3"
@@ -414,10 +414,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <button
                     onClick={() => setIsTrackingModalOpen(true)}
                     className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Iniciar Recorrido"
+                    title="Iniciar Ruta"
                   >
                     <Circle className="w-5 h-5" />
-                    <span className="text-xs font-bold hidden sm:inline">REC</span>
+                    <span className="text-xs font-bold hidden sm:inline">GPS</span>
                   </button>
                 )}
               </div>

@@ -15,6 +15,7 @@ import { useMediaRecorder } from '../hooks/useMediaRecorder';
 import { useAuth } from '../contexts/AuthContext';
 import { getPlotBudgetStats } from '../hooks/useBudgetCalculator';
 import { useOfflineLotSummaries } from '../hooks/useOfflineMedia';
+import { useTracking } from '../contexts/TrackingContext';
 
 import { jsPDF } from 'jspdf';
 import { fetchWeather } from '../services/weatherService';
@@ -37,6 +38,7 @@ export const DashboardView: React.FC = () => {
     const { data, userCompanies, dataOwnerId } = useData();
     const { setView, setSelection, showNotification } = useUI();
     const { currentUser } = useAuth();
+    const { currentTrack } = useTracking();
 
     const chartsContainerRef = useRef<HTMLDivElement>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -663,7 +665,7 @@ export const DashboardView: React.FC = () => {
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(22);
             doc.setFont("helvetica", "bold");
-            const companyName = data.companies.find(c => c.id === effectiveCompanyId)?.name || 'Empresa';
+            const companyName = data.companies.find(c => c.id === effectiveCompanyId)?.name || data.companies.find(c => c.id === sortedFields[0]?.companyId)?.name || 'Empresa';
             doc.text(`${companyName.toUpperCase()}`, 15, 20);
 
             doc.setFontSize(12);
@@ -681,7 +683,7 @@ export const DashboardView: React.FC = () => {
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
                 doc.setFontSize(14);
                 doc.setFont("helvetica", "bold");
-                doc.text("ESTRATEGIA GENERAL", 15, yPos);
+                doc.text("COMENTARIOS DEL INGENIERO", 15, yPos);
 
                 yPos += 7;
 
@@ -769,7 +771,7 @@ export const DashboardView: React.FC = () => {
             doc.text("LOTE", 60, yPos + 7);
             doc.text("CULTIVO", 100, yPos + 7);
             doc.text("ESTADO", 140, yPos + 7);
-            doc.text("ÚLT. RECORRIDA", 175, yPos + 7);
+            doc.text("ULT. RECORRIDA", 175, yPos + 7);
             yPos += 10;
 
             // Rows
@@ -1001,10 +1003,22 @@ export const DashboardView: React.FC = () => {
                     doc.text(`Destino: ${plotNamesGroupedText}`, 20, yPos + 12);
 
                     // Products
-                    const products = recipe.items.map((i: any) => `${i.productName} (${i.dose} ${i.unit})`).join(' + ');
+                    const products = recipe.items.map((i: any) => {
+                        const productName = i.productName || data.agrochemicals.find(a => a.id === i.productId)?.name || 'Producto desconocido';
+                        return `${productName} (${i.dose} ${i.unit})`;
+                    }).join(' + ');
+
+                    // Tasks (Labores)
+                    const tasks = recipe.tasks?.map((t: any) => {
+                        const taskName = t.description || data.tasks.find(tk => tk.id === t.taskId)?.name || 'Labor desconocida';
+                        return taskName;
+                    }).join(', ');
+
+                    const fullContent = products + (tasks ? ` | Labores: ${tasks}` : '') + (recipe.notes ? ` | Nota: ${recipe.notes}` : '');
+
                     doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
                     // Auto-wrap products if too long
-                    const productLines = doc.splitTextToSize(products, pageWidth - 40);
+                    const productLines = doc.splitTextToSize(fullContent, pageWidth - 40);
                     doc.text(productLines, 20, yPos + 18);
 
                     // Adjust yPos based on product lines
@@ -1388,7 +1402,7 @@ export const DashboardView: React.FC = () => {
                         variant="secondary"
                         className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 border-none transition-all"
                     >
-                        <FileDown className="w-4 h-4" /> Generar Informe
+                        <FileDown className="w-4 h-4" /> Informe
                     </Button>
                 </div>
             </div>
@@ -1453,12 +1467,12 @@ export const DashboardView: React.FC = () => {
                                     onClick={() => setShowTracksOverlay(!showTracksOverlay)}
                                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center border ${showTracksOverlay ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50'}`}
                                 >
-                                    <History className="w-3 h-3 mr-1.5" /> {showTracksOverlay ? 'Ocultar Recorridos' : 'Mostrar Recorridos'}
+                                    <History className="w-3 h-3 mr-1.5" /> {showTracksOverlay ? 'Ocultar Rutas' : 'Mostrar Rutas'}
                                 </button>
                                 <button
                                     onClick={() => setShowTrackList(true)}
                                     className="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center border bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                    title="Ver Listado de Recorridos"
+                                    title="Ver Listado de Rutas"
                                 >
                                     <List className="w-3.5 h-3.5" />
                                 </button>
@@ -1503,10 +1517,6 @@ export const DashboardView: React.FC = () => {
                             <BarChart2 className="w-3 h-3 mr-1.5" /> Gráficos
                         </button>
                     </div>
-
-                    <button onClick={() => setIsReportWizardOpen(true)} className="ml-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center bg-green-600 text-white hover:bg-green-700 shadow-sm">
-                        <FileSpreadsheet className="w-3 h-3 mr-1.5" /> Reportes
-                    </button>
                 </div>
             </div>
 
@@ -1548,7 +1558,9 @@ export const DashboardView: React.FC = () => {
                     onPestChange={setSelectedMapPest}
                     availablePests={availablePestsForMap}
                     currentUser={currentUser}
-                    tracks={showTracksOverlay ? filteredTracksForMap : []}
+                    tracks={showTracksOverlay ? (currentTrack ? [...filteredTracksForMap, currentTrack] : filteredTracksForMap) : (currentTrack ? [currentTrack] : [])}
+                    showTracks={showTracksOverlay || !!currentTrack}
+
                     onOpenHistory={(plotId) => {
                         setHistoryPlotId(plotId);
                     }}

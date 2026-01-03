@@ -67,7 +67,7 @@ export const TracksView: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     <Map className="w-6 h-6 text-agro-600" />
-                    Historial de Recorridas
+                    Historial de Rutas GPS
                 </h2>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -139,7 +139,7 @@ export const TracksView: React.FC = () => {
                                                 <button
                                                     onClick={() => setTrackToDelete(track.id)}
                                                     className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                    title="Eliminar Recorrida"
+                                                    title="Eliminar Ruta"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -151,7 +151,7 @@ export const TracksView: React.FC = () => {
                             {filteredTracks.length === 0 && (
                                 <tr>
                                     <td colSpan={7} className="text-center py-10 text-gray-400 italic">
-                                        No se encontraron recorridas registradas.
+                                        No se encontraron rutas registradas.
                                     </td>
                                 </tr>
                             )}
@@ -160,11 +160,11 @@ export const TracksView: React.FC = () => {
                 </div>
             )}
 
-            <Modal isOpen={!!trackToDelete} onClose={() => setTrackToDelete(null)} title="Eliminar Recorrida">
+            <Modal isOpen={!!trackToDelete} onClose={() => setTrackToDelete(null)} title="Eliminar Ruta">
                 <div className="space-y-4">
                     <div className="flex items-center gap-3 text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50">
                         <AlertTriangle className="w-6 h-6 shrink-0" />
-                        <p className="text-sm">¿Estás seguro de que deseas eliminar esta recorrida permanentemente? Esta acción no se puede deshacer.</p>
+                        <p className="text-sm">¿Estás seguro de que deseas eliminar esta ruta permanentemente? Esta acción no se puede deshacer.</p>
                     </div>
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => setTrackToDelete(null)}>Cancelar</Button>

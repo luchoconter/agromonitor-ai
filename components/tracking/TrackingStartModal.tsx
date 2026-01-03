@@ -40,8 +40,8 @@ export const TrackingStartModal: React.FC<TrackingStartModalProps> = ({ isOpen, 
         <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Iniciar Recorrida</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Selecciona el campo donde realizarás la recorrida.</p>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Iniciar Ruta</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Selecciona el campo donde realizarás la ruta.</p>
                 </div>
 
                 <div className="p-4 overflow-y-auto space-y-4 flex-1">
