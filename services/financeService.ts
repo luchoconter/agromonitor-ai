@@ -115,13 +115,37 @@ export const calculateBudgetMetrics = (
             b.cropId === cropId
         ) || null;
 
+        // Initialize actuals with LEGACY SPENT if available
+        let initialSpent = { ...emptyBreakdown() };
+        if (budget?.legacySpent) {
+            const ha = cropStats[cropId].hectares;
+            // Legacy is stored in USD/Ha, convert to Total USD for 'spentTotal' accumulator
+            initialSpent = {
+                herbicidas: (budget.legacySpent.herbicidas || 0) * ha,
+                insecticidas: (budget.legacySpent.insecticidas || 0) * ha,
+                fungicidas: (budget.legacySpent.fungicidas || 0) * ha,
+                fertilizantes: (budget.legacySpent.fertilizantes || 0) * ha,
+                coadyuvantes: (budget.legacySpent.coadyuvantes || 0) * ha,
+                otrosAgroquimicos: (budget.legacySpent.otrosAgroquimicos || 0) * ha,
+                semillas: (budget.legacySpent.semillas || 0) * ha,
+                pulverizacionTerrestre: (budget.legacySpent.pulverizacionTerrestre || 0) * ha,
+                pulverizacionSelectiva: (budget.legacySpent.pulverizacionSelectiva || 0) * ha,
+                pulverizacionAerea: (budget.legacySpent.pulverizacionAerea || 0) * ha,
+                siembra: (budget.legacySpent.siembra || 0) * ha,
+                otrasLabores: (budget.legacySpent.otrasLabores || 0) * ha,
+                total: 0
+            };
+            // Calculate total initial
+            initialSpent.total = Object.values(initialSpent).reduce((a, b) => a + b, 0);
+        }
+
         metrics.push({
             cropId,
             cropName: crop?.name || 'Desconocido',
             totalHectares: cropStats[cropId].hectares,
             budget: budget,
             actuals: { ...emptyBreakdown() },
-            spentTotal: { ...emptyBreakdown() }
+            spentTotal: initialSpent // Start with legacy spent
         });
     }
 

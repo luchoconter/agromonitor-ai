@@ -128,6 +128,23 @@ export interface Budget {
 
   createdAt: number;
   updatedAt: number;
+
+  // NUEVO: Saldos Iniciales / Consumo Histórico (USD/ha)
+  // Permite cargar lo gastado antes de implementar el sistema
+  legacySpent?: {
+    herbicidas: number;
+    insecticidas: number;
+    fungicidas: number;
+    fertilizantes: number;
+    coadyuvantes: number;
+    otrosAgroquimicos: number;
+    semillas: number;
+    pulverizacionTerrestre: number;
+    pulverizacionSelectiva: number;
+    pulverizacionAerea: number;
+    siembra: number;
+    otrasLabores: number;
+  };
 }
 
 export interface Prescription {

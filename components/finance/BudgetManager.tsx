@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { useUI } from '../../contexts/UIContext';
 import { Select, Button, Input } from '../UI';
-import { Save, AlertTriangle, DollarSign } from 'lucide-react';
+import { Save, AlertTriangle, DollarSign, History } from 'lucide-react';
 import { Budget } from '../../types/models';
+import { LegacyBudgetModal } from './LegacyBudgetModal';
 import * as BudgetRepo from '../../services/repositories/budgetRepository';
 import { getBudgets } from '../../services/repositories/budgetRepository';
 
@@ -47,6 +48,10 @@ export const BudgetManager: React.FC = () => {
     // Budgets Map: CropId -> Budget
     const [budgets, setBudgets] = useState<Record<string, Budget>>({});
     const [loading, setLoading] = useState(false);
+
+    // Legacy State
+    const [legacyModalOpen, setLegacyModalOpen] = useState(false);
+    const [selectedCropForLegacy, setSelectedCropForLegacy] = useState<any | null>(null);
 
     // Initialize defaults
     useEffect(() => {
@@ -253,9 +258,19 @@ export const BudgetManager: React.FC = () => {
                                         <button
                                             onClick={() => handleSave(crop.id)}
                                             className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                            title="Guardar"
+                                            title="Guardar Presupuesto"
                                         >
                                             <Save className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCropForLegacy(crop);
+                                                setLegacyModalOpen(true);
+                                            }}
+                                            className="p-1.5 text-amber-600 hover:bg-amber-100 rounded transition-colors ml-1"
+                                            title="Cargar Saldos Iniciales / Históricos"
+                                        >
+                                            <History className="w-4 h-4" />
                                         </button>
                                     </td>
                                 </tr>
@@ -264,9 +279,45 @@ export const BudgetManager: React.FC = () => {
                     </tbody>
                 </table>
             </div>
-            <div className="text-xs text-gray-400 text-center">
-                * Los valores están expresados en Dólares por Hectárea (USD/ha). Ingrese 0 si no aplica.
+            <div className="text-xs text-gray-400 text-center space-y-1">
+                <p>* Los valores están expresados en Dólares por Hectárea (USD/ha). Ingrese 0 si no aplica.</p>
+                <p>* Use el botón <History className="w-3 h-3 inline text-amber-500" /> para cargar consumos previos a la plataforma.</p>
             </div>
+
+            {/* Legacy Modal */}
+            {selectedCropForLegacy && (
+                <LegacyBudgetModal
+                    isOpen={legacyModalOpen}
+                    onClose={() => setLegacyModalOpen(false)}
+                    budget={budgets[selectedCropForLegacy.id] || {
+                        id: 'new',
+                        companyId: selectedCompanyId,
+                        seasonId: selectedSeasonId,
+                        cropId: selectedCropForLegacy.id,
+                        herbicidas: 0, insecticidas: 0, fungicidas: 0, fertilizantes: 0,
+                        coadyuvantes: 0, otrosAgroquimicos: 0, semillas: 0,
+                        pulverizacionTerrestre: 0, pulverizacionSelectiva: 0, pulverizacionAerea: 0,
+                        siembra: 0, otrasLabores: 0
+                    }}
+                    cropName={selectedCropForLegacy.name}
+                    onSave={() => {
+                        setLegacyModalOpen(false);
+                        // Reload budgets to reflect changes
+                        const load = async () => {
+                            setLoading(true);
+                            try {
+                                const fetched = await getBudgets(selectedCompanyId, selectedSeasonId);
+                                const map: Record<string, Budget> = {};
+                                fetched.forEach(b => map[b.cropId] = b);
+                                setBudgets(map);
+                            } catch (error) { console.error(error); } finally { setLoading(false); }
+                        };
+                        load();
+                    }}
+                />
+            )}
         </div>
     );
 };
+
+

@@ -3,8 +3,9 @@ import { useData } from '../../contexts/DataContext';
 import { calculateBudgetMetrics, BudgetExecutionMetrics, CostBreakdown } from '../../services/financeService';
 import { getBudgets } from '../../services/repositories/budgetRepository';
 import { BudgetSummary } from '../finance/BudgetSummary';
+import { LegacyBudgetModal } from '../finance/LegacyBudgetModal';
 import { BudgetProgressBar } from '../finance/BudgetProgressBar';
-import { Wallet, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Wallet, ChevronDown, ChevronUp, AlertTriangle, History } from 'lucide-react';
 
 interface BudgetSectionProps {
     seasonId: string;
@@ -17,38 +18,36 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({ seasonId, companyI
     const [loading, setLoading] = useState(false);
     const [expandedCropId, setExpandedCropId] = useState<string | null>(null);
 
-    // Fetch Data & Calculate
-    useEffect(() => {
+    // Legacy Budget Modal State
+    const [legacyModalOpen, setLegacyModalOpen] = useState(false);
+    const [selectedMetricForLegacy, setSelectedMetricForLegacy] = useState<BudgetExecutionMetrics | null>(null);
+
+    // Fetch Data & Calculate Wrapper to allow refresh
+    const loadMetrics = async () => {
         if (!companyId || !seasonId) return;
-
-        const load = async () => {
-            setLoading(true);
-            try {
-                // Fetch specific budgets for this context from Firestore
-                const budgets = await getBudgets(companyId, seasonId);
-
-                // Use sync calculation with loaded data + fetched budgets
-                const result = calculateBudgetMetrics(companyId, seasonId, {
-                    ...data,
-                    budgets
-                });
-
-                setMetrics(result);
-
-                // AUTO-EXPAND: If there are results, expand the first one by default to show charts
-                if (result.length > 0) {
-                    // Check if any is already expanded, if not expand first
-                    setExpandedCropId(prev => prev || result[0].cropId);
-                }
-
-            } catch (error) {
-                console.error("Error calculating budget:", error);
-            } finally {
-                setLoading(false);
+        setLoading(true);
+        try {
+            const budgets = await getBudgets(companyId, seasonId);
+            const result = calculateBudgetMetrics(companyId, seasonId, { ...data, budgets });
+            setMetrics(result);
+            if (result.length > 0 && !expandedCropId) {
+                setExpandedCropId(result[0].cropId);
             }
-        };
-        load();
-    }, [companyId, seasonId, data]);
+        } catch (error) {
+            console.error("Error calculating budget:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Update effect to use the wrapper
+    useEffect(() => { loadMetrics(); }, [companyId, seasonId, data]);
+
+    const handleOpenLegacy = (metric: BudgetExecutionMetrics) => {
+        if (!metric.budget) return; // Should allow creating one? Ideally yes, but let's stick to existing
+        setSelectedMetricForLegacy(metric);
+        setLegacyModalOpen(true);
+    };
 
     const categories: { key: keyof CostBreakdown; label: string }[] = [
         { key: 'herbicidas', label: 'Herbicidas' },
@@ -69,6 +68,20 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({ seasonId, companyI
 
     return (
         <div className="space-y-6 animate-fade-in">
+            {/* Modal */}
+            {selectedMetricForLegacy && selectedMetricForLegacy.budget && (
+                <LegacyBudgetModal
+                    isOpen={legacyModalOpen}
+                    onClose={() => setLegacyModalOpen(false)}
+                    budget={selectedMetricForLegacy.budget}
+                    cropName={selectedMetricForLegacy.cropName}
+                    onSave={() => {
+                        setLegacyModalOpen(false);
+                        loadMetrics(); // Refresh data
+                    }}
+                />
+            )}
+
             <div className="flex items-center gap-2 mb-2">
                 <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg text-emerald-700 dark:text-emerald-400">
                     <Wallet className="w-5 h-5" />
@@ -125,6 +138,17 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({ seasonId, companyI
                                         </div>
                                     ) : (
                                         <>
+                                            {/* ACTION BAR: Ajustar Saldos */}
+                                            <div className="flex justify-end">
+                                                <button
+                                                    onClick={() => handleOpenLegacy(metric)}
+                                                    className="flex items-center gap-2 text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors border border-amber-200"
+                                                >
+                                                    <History className="w-4 h-4" />
+                                                    Cargar Saldos Iniciales
+                                                </button>
+                                            </div>
+
                                             {/* 1. EXECUTIVE SUMMARY */}
                                             <BudgetSummary
                                                 totalSpent={metric.actuals.total}
