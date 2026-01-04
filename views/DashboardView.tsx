@@ -1132,7 +1132,7 @@ export const DashboardView: React.FC = () => {
             doc.setFontSize(10);
             doc.setFont("helvetica", "normal");
             doc.text(`Fecha: ${dateStr}`, pageWidth - 15, 15, { align: 'right' });
-            doc.text("Ing Marcon", pageWidth - 15, 22, { align: 'right' });
+            doc.text("Ing Marcon V1.0", pageWidth - 15, 22, { align: 'right' });
 
             doc.setDrawColor(200, 200, 200);
             doc.setFillColor(250, 250, 250);

@@ -54,6 +54,11 @@ export const TracksView: React.FC = () => {
     };
 
     const filteredTracks = tracks.filter(t => {
+        // Operator filter: can only see their own tracks
+        if (currentUser?.role === 'operator' && t.userId !== currentUser.id) {
+            return false;
+        }
+
         const term = searchTerm.toLowerCase();
         return (
             (t.name?.toLowerCase().includes(term)) ||

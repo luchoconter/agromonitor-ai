@@ -93,7 +93,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (view === 'crop-assignments') return 'Asignación de Cultivos';
     if (view === 'budget-manager') return 'Gestión de Presupuestos';
     if (view.startsWith('manage-')) return 'Gestión';
-    return 'Ing Marcon';
+    return 'Ing Marcon V1.0';
   };
 
   return (
