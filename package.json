@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
     "@vitejs/plugin-react": "^5.1.1",
     "firebase": "^12.6.0",
     "html2canvas": "^1.4.1",

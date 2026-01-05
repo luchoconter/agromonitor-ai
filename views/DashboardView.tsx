@@ -2,14 +2,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
-import { Search, BrainCircuit, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History, Cloud, ChevronDown, ChevronUp, FlaskConical, List, Pause, Play } from 'lucide-react';
+import { Search, FileSpreadsheet, X, PieChart as PieIcon, Bug, Loader2, Share2, FileDown, Map as MapIcon, BarChart2, Calendar, Layers, RotateCcw, Clock, Eye, EyeOff, LayoutList, Send, History, Cloud, ChevronDown, ChevronUp, FlaskConical, List, Pause, Play } from 'lucide-react';
 import { Prescription } from '../types';
 import { LotSummary } from '../types';
 import { TrackSession } from '../types/tracking';
 import { Button, Modal, Select } from '../components/UI';
 import { getUserRole, getRoleColorClass } from '../utils/roleUtils';
 import * as Storage from '../services/storageService';
-import * as AI from '../services/geminiService';
+// import * as AI from '../services/geminiService'; // Removed per user request
 import * as Export from '../services/exportService';
 import { useMediaRecorder } from '../hooks/useMediaRecorder';
 import { useAuth } from '../contexts/AuthContext';
@@ -65,12 +65,11 @@ export const DashboardView: React.FC = () => {
     const [selectedMapPest, setSelectedMapPest] = useState<string>('');
     const [selectedTrackUser, setSelectedTrackUser] = useState<string>('');
 
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    // isAnalyzing removed
     const [isExporting, setIsExporting] = useState(false);
     const [fileToShare, setFileToShare] = useState<File | null>(null);
 
-    const [showAiModal, setShowAiModal] = useState(false);
-    const [editableReport, setEditableReport] = useState('');
+    // AI State removed
 
     // REPORT WIZARD STATE
     const [isReportWizardOpen, setIsReportWizardOpen] = useState(false);
@@ -1636,28 +1635,7 @@ export const DashboardView: React.FC = () => {
                 </div>
             </Modal>
 
-            <Modal isOpen={showAiModal} onClose={() => setShowAiModal(false)} title="Análisis de IA (Editable)">
-                <div className="space-y-4">
-                    <textarea value={editableReport} onChange={(e) => setEditableReport(e.target.value)} className="w-full h-80 p-4 border rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-agro-500" />
-                    <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                        <Button variant="ghost" onClick={() => { setShowAiModal(false); setFileToShare(null); }}>Cerrar</Button>
-
-                        {/* 2-STEP SHARE BUTTON LOGIC */}
-                        {fileToShare ? (
-                            <Button onClick={triggerNativeShare} className="bg-green-600 hover:bg-green-700 text-white animate-pulse">
-                                <Send className="w-4 h-4 mr-2" /> Enviar Ahora
-                            </Button>
-                        ) : (
-                            <Button variant="secondary" onClick={() => handleExportPDF('share')} disabled={isExporting}>
-                                {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Share2 className="w-4 h-4 mr-2" />}
-                                {isExporting ? 'Generando...' : 'Compartir'}
-                            </Button>
-                        )}
-
-                        <Button onClick={() => handleExportPDF('download')} disabled={isExporting}><FileDown className="w-4 h-4 mr-2" /> Exportar PDF</Button>
-                    </div>
-                </div>
-            </Modal>
+            {/* AI Modal Removed */}
 
             {historyPlotId && (
                 <LotHistoryModal
