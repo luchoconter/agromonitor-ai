@@ -79,12 +79,16 @@ export const PlotMapModal: React.FC<PlotMapModalProps> = ({ isOpen, onClose, plo
         });
 
         const url = mapType === 'street'
-            ? 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
-            : 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'; // y = hybrid (sat + labels)
+            ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+        const attribution = mapType === 'street'
+            ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            : 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
 
         L.tileLayer(url, {
             maxZoom: 20,
-            attribution: '© Google Maps'
+            attribution
         }).addTo(map);
     }, [mapType, isOpen]);
 

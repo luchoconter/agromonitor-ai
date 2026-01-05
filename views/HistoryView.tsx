@@ -226,10 +226,14 @@ export const HistoryView: React.FC = () => {
 
         if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
         const tileUrl = mapType === 'satellite'
-            ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
-            : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+            ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-        tileLayerRef.current = L.tileLayer(tileUrl, { attribution: '© Google Maps' }).addTo(map);
+        const attribution = mapType === 'satellite'
+            ? 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+        tileLayerRef.current = L.tileLayer(tileUrl, { attribution }).addTo(map);
         map.eachLayer((layer: any) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
         if (legendControlRef.current) { map.removeControl(legendControlRef.current); legendControlRef.current = null; }
 
