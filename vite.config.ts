@@ -14,8 +14,8 @@ export default defineConfig({
       },
       includeAssets: ['icon-192.png', 'icon-512.png', 'manifest.json'],
       manifest: {
-        name: 'Ing Marcon V1.0',
-        short_name: 'Ing Marcon V1.0',
+        name: 'Ing Marcon V1.2',
+        short_name: 'Ing Marcon V1.2',
         start_url: '/',
         display: 'standalone',
         background_color: '#f8fafc',
