@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo, use
 import { createPortal } from 'react-dom';
 import { MonitoringRecord, Plot, LotSummary, PlotAssignment, Crop, Field, Prescription } from '../../types';
 import { TrackSession } from '../../types/tracking';
-import { calculateDistance } from '../../services/trackingService';
+import { calculateDistance, calculateStops } from '../../services/trackingService';
 import { Layers, Maximize2, Minimize2, Circle as CircleIcon, Square, BookOpen } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 
@@ -676,52 +676,35 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                 L.marker(endPoint, { icon: endIcon, zIndexOffset: 1000 }).addTo(map).bindTooltip("Fin", { direction: 'top', offset: [0, -6] });
 
                 // 3. Stop Detection Logic
-                if (track.points.length > 2) {
-                    const STOP_RADIUS_KM = 0.03; // 30 meters
-                    const MIN_STOP_MINUTES = 1;
+                const stops = calculateStops(track.points);
+                stops.forEach(stop => {
+                    const stopLabel = `${Math.floor(stop.durationMinutes)}m`;
+                    const stopHtml = `
+                        <div style="background-color: ${STOP_COLOR}; color: white; padding: 1px 4px; border-radius: 4px; font-size: 9px; font-weight: bold; border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap;">
+                            ${stopLabel}
+                        </div>
+                    `;
+                    const stopIcon = L.divIcon({
+                        className: 'stop-label',
+                        html: stopHtml,
+                        iconSize: [30, 16],
+                        iconAnchor: [15, 20]
+                    });
 
-                    let anchorIdx = 0;
-
-                    for (let i = 1; i < track.points.length; i++) {
-                        const anchor = track.points[anchorIdx];
-                        const current = track.points[i];
-
-                        const dist = calculateDistance(anchor.lat, anchor.lng, current.lat, current.lng);
-
-                        if (dist > STOP_RADIUS_KM) {
-                            // Movement detected, check if previous segment was a stop
-                            const startTime = new Date(anchor.timestamp).getTime();
-                            const endTime = new Date(track.points[i - 1].timestamp).getTime(); // Time at last point INSIDE radius
-                            const durationMins = (endTime - startTime) / (1000 * 60);
-
-                            if (durationMins >= MIN_STOP_MINUTES) {
-                                // It was a stop!
-                                const stopLabel = `${Math.floor(durationMins)}m`;
-                                const stopHtml = `
-                                    <div style="background-color: ${STOP_COLOR}; color: white; padding: 1px 4px; border-radius: 4px; font-size: 9px; font-weight: bold; border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap;">
-                                        ${stopLabel}
-                                    </div>
-                                 `;
-                                const stopIcon = L.divIcon({
-                                    className: 'stop-label',
-                                    html: stopHtml,
-                                    iconSize: [30, 16],
-                                    iconAnchor: [15, 20] // Offset a bit up
-                                });
-
-                                L.marker([anchor.lat, anchor.lng], { icon: stopIcon, zIndexOffset: 900 }).addTo(map)
-                                    .bindPopup(`<b>Parada Detectada</b><br/>Duración: ${durationMins.toFixed(1)} min<br/>Hora: ${new Date(anchor.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-                            }
-
-                            // Reset anchor
-                            anchorIdx = i;
-                        }
-                    }
-                }
+                    L.marker([stop.lat, stop.lng], { icon: stopIcon, zIndexOffset: 900 }).addTo(map)
+                        .bindPopup(`<b>Parada Detectada</b><br/>Duración: ${stop.durationMinutes.toFixed(1)} min<br/>Hora: ${new Date(stop.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+                });
             });
 
             // NOTE: We do NOT fit bounds to tracks here to avoid disrupting the plot view.
             // Tracks are an overlay.
+            // EXCEPTION: If there are no other markers (e.g. specialized track view), fit to tracks.
+            if (markers.length === 0) {
+                const allPoints = tracks.flatMap(t => t.points.map(p => [p.lat, p.lng] as [number, number]));
+                if (allPoints.length > 0) {
+                    map.fitBounds(allPoints, { padding: [50, 50] });
+                }
+            }
         }
 
     }, [monitorings, plots, mapColorMode, summaries, isExporting, selectedPestForMap, pestAnalytics, activeFilter, mapType, onSelectSummary, showHistory, isMaximized, tracks, showTracks]);

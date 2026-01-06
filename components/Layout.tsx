@@ -362,7 +362,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col shadow-sm z-10 hidden md:flex">
         <div className="p-6 flex items-center space-x-2 border-b border-gray-100 dark:border-gray-700">
           <div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-6 h-6 text-white" /></div>
-          <div><h1 className="text-xl font-bold text-gray-800 dark:text-white tracking-tight leading-none">Ing Marcon V1.0</h1></div>
+          <div><h1 className="text-xl font-bold text-gray-800 dark:text-white tracking-tight leading-none">Ing Marcon V1.2</h1></div>
         </div>
         {renderNavItems()}
       </aside>
@@ -373,7 +373,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
             <aside className="relative w-72 bg-white dark:bg-gray-800 h-full shadow-2xl flex flex-col animate-slide-in-left">
               <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-700">
-                <div className="flex items-center space-x-2"><div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-5 h-5 text-white" /></div><span className="font-bold text-gray-800 dark:text-white">Ing Marcon V1.0</span></div>
+                <div className="flex items-center space-x-2"><div className="bg-agro-600 dark:bg-agro-500 p-2 rounded-lg"><Sprout className="w-5 h-5 text-white" /></div><span className="font-bold text-gray-800 dark:text-white">Ing Marcon V1.2</span></div>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X className="w-6 h-6" /></button>
               </div>
               {renderNavItems()}

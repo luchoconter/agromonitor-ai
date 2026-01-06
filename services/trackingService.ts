@@ -1,5 +1,69 @@
 import { TrackPoint } from '../types/tracking';
 
+export interface Stop {
+    lat: number;
+    lng: number;
+    startTime: number;
+    endTime: number;
+    durationMinutes: number;
+}
+
+export const calculateStops = (points: TrackPoint[], minDurationMinutes: number = 1, radiusKm: number = 0.03): Stop[] => {
+    if (!points || points.length < 2) return [];
+
+    const stops: Stop[] = [];
+    let anchorIdx = 0;
+
+    for (let i = 1; i < points.length; i++) {
+        const anchor = points[anchorIdx];
+        const current = points[i];
+
+        // Safety check for invalid coords
+        if (!anchor.lat || !anchor.lng || !current.lat || !current.lng) continue;
+
+        const dist = calculateDistance(anchor.lat, anchor.lng, current.lat, current.lng);
+
+        if (dist > radiusKm) {
+            // Movement detected, check if we were stopped
+            const startTime = new Date(anchor.timestamp).getTime();
+            const endTime = new Date(points[i - 1].timestamp).getTime();
+            const durationMinutes = (endTime - startTime) / (1000 * 60);
+
+            if (durationMinutes >= minDurationMinutes) {
+                stops.push({
+                    lat: anchor.lat,
+                    lng: anchor.lng,
+                    startTime,
+                    endTime,
+                    durationMinutes
+                });
+            }
+            anchorIdx = i; // Reset anchor to new position
+        }
+    }
+
+    // Check stop at the end
+    const lastIdx = points.length - 1;
+    if (anchorIdx < lastIdx) {
+        const anchor = points[anchorIdx];
+        const startTime = new Date(anchor.timestamp).getTime();
+        const endTime = new Date(points[lastIdx].timestamp).getTime();
+        const durationMinutes = (endTime - startTime) / (1000 * 60);
+
+        if (durationMinutes >= minDurationMinutes) {
+            stops.push({
+                lat: anchor.lat,
+                lng: anchor.lng,
+                startTime,
+                endTime,
+                durationMinutes
+            });
+        }
+    }
+
+    return stops;
+};
+
 export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Radius of the earth in km
     const dLat = deg2rad(lat2 - lat1);

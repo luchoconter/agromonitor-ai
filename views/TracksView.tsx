@@ -3,8 +3,10 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import * as Storage from '../services/storageService';
 import { TrackSession } from '../types/tracking';
-import { Trash2, Map, Search, AlertTriangle, Loader2 } from 'lucide-react';
+import { calculateStops } from '../services/trackingService';
+import { Trash2, Map, Search, AlertTriangle, Loader2, PauseCircle, Eye } from 'lucide-react';
 import { Modal, Button } from '../components/UI';
+import { MapSection } from '../components/dashboard/MapSection';
 
 export const TracksView: React.FC = () => {
     const { data } = useData();
@@ -13,6 +15,7 @@ export const TracksView: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+    const [selectedTrack, setSelectedTrack] = useState<TrackSession | null>(null);
 
     // Initial Load
     useEffect(() => {
@@ -98,8 +101,9 @@ export const TracksView: React.FC = () => {
                                 <th className="px-4 py-3 whitespace-nowrap">Usuario</th>
                                 <th className="px-4 py-3 text-center whitespace-nowrap">Duración</th>
                                 <th className="px-4 py-3 text-center whitespace-nowrap">Distancia</th>
+                                <th className="px-4 py-3 text-center whitespace-nowrap">Detenciones</th>
                                 <th className="px-4 py-3 w-1/3">Detalle</th>
-                                {currentUser?.role === 'admin' && <th className="px-4 py-3 text-right">Acciones</th>}
+                                <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
@@ -133,23 +137,38 @@ export const TracksView: React.FC = () => {
                                         <td className="px-4 py-3 text-center whitespace-nowrap">
                                             <span className="font-mono font-bold">{track.distance.toFixed(2)} km</span>
                                         </td>
+                                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1 text-orange-600 dark:text-orange-400">
+                                                <PauseCircle className="w-4 h-4" />
+                                                <span className="font-mono font-bold">{calculateStops(track.points || []).length}</span>
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3">
                                             {track.name && <div className="font-bold text-gray-800 dark:text-gray-200">{track.name}</div>}
                                             {track.notes ? (
                                                 <div className="text-xs text-gray-500 italic truncate max-w-[300px]" title={track.notes}>{track.notes}</div>
                                             ) : <span className="text-xs text-gray-400">-</span>}
                                         </td>
-                                        {currentUser?.role === 'admin' && (
-                                            <td className="px-4 py-3 text-right">
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => setTrackToDelete(track.id)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                    title="Eliminar Ruta"
+                                                    onClick={() => setSelectedTrack(track)}
+                                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                    title="Ver en mapa"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Eye className="w-4 h-4" />
                                                 </button>
-                                            </td>
-                                        )}
+                                                {currentUser?.role === 'admin' && (
+                                                    <button
+                                                        onClick={() => setTrackToDelete(track.id)}
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                        title="Eliminar Ruta"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -175,6 +194,24 @@ export const TracksView: React.FC = () => {
                         <Button variant="ghost" onClick={() => setTrackToDelete(null)}>Cancelar</Button>
                         <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">Eliminar</Button>
                     </div>
+                </div>
+            </Modal>
+
+            {/* View Track Map Modal */}
+            <Modal isOpen={!!selectedTrack} onClose={() => setSelectedTrack(null)} title="Visualizar Recorrido" size="xl">
+                <div className="h-[60vh] w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                    {selectedTrack && (
+                        <MapSection
+                            monitorings={[]}
+                            plots={[]}
+                            tracks={[selectedTrack]}
+                            showTracks={true}
+                            isVisible={true}
+                        />
+                    )}
+                </div>
+                <div className="mt-4 flex justify-end">
+                    <Button onClick={() => setSelectedTrack(null)}>Cerrar</Button>
                 </div>
             </Modal>
         </div>

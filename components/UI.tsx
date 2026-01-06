@@ -187,14 +187,24 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   zIndex?: number;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, zIndex = 110000 }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, zIndex = 110000, size = 'md' }) => {
   if (!isOpen) return null;
+
+  const sizeClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    'full': 'max-w-full m-4'
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 transition-all duration-200" style={{ zIndex }}>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col relative">
+      <div className={`bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full ${sizeClasses[size] || sizeClasses.md} overflow-hidden animate-fade-in border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col relative`}>
         <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 shrink-0">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
