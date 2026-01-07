@@ -189,7 +189,8 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
 
     return (
         <>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
+            {/* --- DESKTOP TABLE VIEW --- */}
+            <div className="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-semibold uppercase text-xs">
                         <tr>
@@ -223,8 +224,6 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                                     <span className="text-[9px] font-normal text-gray-400 normal-case">(Ingeniero)</span>
                                 </div>
                             </th>
-
-
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -271,40 +270,8 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                             const activePrescription = pendingPrescriptions[0]; // Target the newest pending one
                             const pendingCount = pendingPrescriptions.length;
 
-                            const execution = activePrescription?.executionData?.[plot.id] || { executed: false, observation: '' };
-
                             const assignment = data.assignments.find(a => a.plotId === plot.id && (seasonId ? a.seasonId === seasonId : true));
                             const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name;
-
-                            let budgetDisplay = <span className="text-gray-300 dark:text-gray-700">-</span>;
-                            if (assignment && assignment.budget && assignment.budget > 0) {
-                                const stats = getPlotBudgetStats(plot, assignment, prescriptions, data.agrochemicals);
-                                const isCritical = stats.spent > stats.totalBudget;
-                                const isWarning = stats.spent > (stats.totalBudget * 0.8) && !isCritical;
-
-                                let barColor = 'bg-blue-500';
-                                if (isCritical) barColor = 'bg-red-500';
-                                else if (isWarning) barColor = 'bg-yellow-500';
-                                else barColor = 'bg-green-500';
-
-                                const spentStr = stats.spent.toLocaleString(undefined, { maximumFractionDigits: 1 });
-                                const totalStr = stats.totalBudget.toLocaleString();
-
-                                budgetDisplay = (
-                                    <div className="w-28 mx-auto flex flex-col items-center">
-                                        <div className="flex items-center gap-1 mb-0.5">
-                                            <span className="text-[9px] text-gray-400 font-normal">Gastado:</span>
-                                            <span className={`text-xs font-bold font-mono ${isCritical ? 'text-red-600' : 'text-gray-700 dark:text-gray-200'}`}>
-                                                ${spentStr}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400">/ ${totalStr}</span>
-                                        </div>
-                                        <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden" title={`${Math.round(stats.progress)}% consumido`}>
-                                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(100, stats.progress)}%` }}></div>
-                                        </div>
-                                    </div>
-                                );
-                            }
 
                             return (
                                 <tr key={plot.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors">
@@ -405,15 +372,114 @@ export const LotSituationTable: React.FC<LotSituationTableProps> = ({
                                             <span className="text-gray-300 dark:text-gray-700">-</span>
                                         )}
                                     </td>
-
-
-
-
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
+            </div>
+
+            {/* --- MOBILE CARD VIEW --- */}
+            <div className="md:hidden space-y-3">
+                {plots.map(plot => {
+                    const field = data.fields.find(f => f.id === plot.fieldId);
+                    const companyId = plot.companyId || field?.companyId;
+                    const fieldName = field?.name || '-';
+
+                    const plotSummaries = summaries.filter(s => s.plotId === plot.id);
+                    const latestSummary = plotSummaries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                    const status = latestSummary ? (latestSummary.engineerStatus || latestSummary.status) : 'none';
+
+                    const plotMonitorings = data.monitorings.filter(m => m.plotId === plot.id);
+                    const sortedMonitorings = plotMonitorings.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    const latestMonitoring = sortedMonitorings[0];
+                    const phenology = latestMonitoring?.phenology;
+
+                    let stand: number | undefined = undefined;
+                    if (latestMonitoring) {
+                        const latestDateStr = new Date(latestMonitoring.date).toDateString();
+                        const sameDayMeasurements = sortedMonitorings.filter(m =>
+                            new Date(m.date).toDateString() === latestDateStr && m.standData && m.standData.plantsPerMeter > 0
+                        );
+                        if (sameDayMeasurements.length > 0) {
+                            const totalPPM = sameDayMeasurements.reduce((acc, m) => acc + (m.standData?.plantsPerMeter || 0), 0);
+                            const avgPPM = totalPPM / sameDayMeasurements.length;
+                            const distance = sameDayMeasurements[0].standData!.distanceBetweenRows;
+                            if (distance > 0) stand = Math.round((avgPPM / distance) * 10000);
+                        }
+                    }
+
+                    const allActivePrescriptions = prescriptions.filter(p => p.plotIds.includes(plot.id) && p.status === 'active').sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    const pendingPrescriptions = allActivePrescriptions.filter(p => !p.executionData?.[plot.id]?.executed);
+                    const activePrescription = pendingPrescriptions[0];
+                    const pendingCount = pendingPrescriptions.length;
+
+                    const assignment = data.assignments.find(a => a.plotId === plot.id && (seasonId ? a.seasonId === seasonId : true));
+                    const cropName = data.crops.find(c => c.id === assignment?.cropId)?.name;
+
+                    return (
+                        <div key={plot.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 relative">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <button onClick={() => onOpenHistory(plot.id)} className="font-bold text-gray-900 dark:text-white text-lg hover:text-blue-600 dark:hover:text-blue-400 hover:underline">{plot.name}</button>
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                        <MapPin className="w-3 h-3" /> {fieldName}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (latestSummary) setSelectedSummary(latestSummary);
+                                        else if (isEngineer) setSelectedSummary({
+                                            plotId: plot.id, fieldId: plot.fieldId, companyId: companyId || '',
+                                            seasonId: seasonId || '', date: new Date().toISOString(), status: 'verde',
+                                            ownerId: plot.ownerId, ownerName: plot.ownerName, isReviewed: false
+                                        } as any);
+                                    }}
+                                    className={`w-8 h-8 rounded-full shadow-sm border-2 border-white dark:border-gray-800 flex items-center justify-center ${getStatusColor(status)} ${(!latestSummary && !isEngineer) ? 'opacity-30' : 'cursor-pointer hover:scale-110 transition-transform'}`}
+                                >
+                                </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                <span className={`px-2 py-0.5 rounded text-xs font-bold border bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600`}>
+                                    {cropName || 'Sin Cultivo'}
+                                </span>
+                                {phenology && (
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${phenology.startsWith('V') ? 'text-green-600 bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800' :
+                                        phenology.startsWith('R') ? 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800' :
+                                            'text-gray-500 bg-gray-100 border-gray-200'
+                                        }`}>
+                                        {phenology}
+                                    </span>
+                                )}
+                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-gray-50 dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-700">
+                                    {plot.hectares} Has
+                                </span>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+                                <div className="text-center">
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold">Stand (pl/ha)</div>
+                                    {stand ? (
+                                        <span className="font-mono font-bold text-gray-700 dark:text-gray-200 text-sm">{stand.toLocaleString()}</span>
+                                    ) : <span className="text-gray-300">-</span>}
+                                </div>
+
+                                {activePrescription ? (
+                                    <button
+                                        onClick={() => onOpenPrescriptions(plot.id)}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-xs font-bold"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        {pendingCount > 1 ? `${pendingCount} RECETAS` : 'VER RECETA'}
+                                    </button>
+                                ) : (
+                                    <div className="text-xs text-gray-300 dark:text-gray-600 italic">Sin recetas pendientes</div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* --- POPUP: DETALLE DE ESTADO --- */}

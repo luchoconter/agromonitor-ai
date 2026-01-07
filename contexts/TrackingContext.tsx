@@ -40,24 +40,30 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
     const lastPointRef = useRef<TrackPoint | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Timer Logic
+    // Timer Logic: Use Date.now() delta to calculate elapsed time accurately
     useEffect(() => {
-        if (isTracking && !isPaused) {
-            timerRef.current = setInterval(() => {
-                setElapsedTime(prev => prev + 1);
+        let intervalId: NodeJS.Timeout | null = null;
+
+        if (isTracking && !isPaused && currentTrack?.startTime) {
+            const start = new Date(currentTrack.startTime).getTime();
+
+            // Immediate update
+            setElapsedTime(Math.floor((Date.now() - start) / 1000));
+
+            intervalId = setInterval(() => {
+                const now = Date.now();
+                setElapsedTime(Math.floor((now - start) / 1000));
             }, 1000);
-        } else {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
+        } else if (!isTracking) {
+            // Reset if not tracking
         }
+
         return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
+            if (intervalId) {
+                clearInterval(intervalId);
             }
         };
-    }, [isTracking, isPaused]);
+    }, [isTracking, isPaused, currentTrack?.startTime]);
 
     // --- RESTORE ACTIVE TRACK ON MOUNT ---
     useEffect(() => {
@@ -101,8 +107,23 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (document.visibilityState === 'visible' && isTracking && !isPaused) {
                 console.log("App foregrounded, ensuring WakeLock and GPS...");
                 await requestWakeLock();
-                // If watchId was lost? usually navigator.geolocation keeps it, but safe to check?
-                // For now just WakeLock is the most fragile part.
+
+                // If the app was backgrounded for a long time, the watch might have been killed.
+                // We re-affirm the watch.
+                if (watchIdRef.current === null) {
+                    console.log("WatchID lost, restarting GPS...");
+                    startGpsWatch();
+                } else {
+                    // Force a single update to check if still alive
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => console.log("GPS Alive check:", pos.coords.latitude),
+                        () => {
+                            console.warn("GPS appears dead, restarting...");
+                            startGpsWatch();
+                        },
+                        { timeout: 5000, maximumAge: 0 }
+                    );
+                }
             }
         };
 
@@ -273,9 +294,12 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         const { saveTrackOffline, markTrackSynced, deleteActiveTrack } = await import('../services/offlineTrackService');
 
-        if (save && currentTrack) {
+        // Use local variable for currentTrack to avoid state update race conditions
+        const trackToSave = currentTrack;
+
+        if (save && trackToSave) {
             const finalTrack: TrackSession = {
-                ...currentTrack,
+                ...trackToSave,
                 endTime: new Date().toISOString(),
                 status: 'completed',
                 distance: distanceTraveled,
@@ -284,35 +308,40 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
             };
 
             try {
-                // 1. Save Offline Final
+                // 1. Save Offline Final (This is our source of truth until synced)
                 await saveTrackOffline(finalTrack);
+                console.log("Track saved locally successfully", finalTrack.id);
 
-                // 2. Remove from "Active" store
+                // 2. Remove from "Active" store (since it is now a finished track)
                 await deleteActiveTrack(finalTrack.id);
 
-                // 3. Try Sync
+                // 3. Try Sync to Firestore
                 if (navigator.onLine) {
                     try {
+                        console.log("Attempting to sync track to Firestore...");
                         await saveTrack(finalTrack);
                         await markTrackSynced(finalTrack.id);
-                        // No need to set status on object, we just reload or use what's in DB
-                        console.log("Track synced successfully");
+                        console.log("Track synced successfully to Firestore");
                     } catch (syncErr) {
-                        console.warn("Sync failed, enqueuing for later", syncErr);
+                        console.warn("Sync failed, enqueuing for later. Error:", syncErr);
+                        // Ensure it is queued for auto-sync
                         enqueueOperation('addTrack', { id: finalTrack.id });
                     }
                 } else {
-                    console.log("Offline mode: Track saved locally, enqueuing.");
+                    console.log("Offline mode: Track saved locally, enqueuing for background sync.");
                     enqueueOperation('addTrack', { id: finalTrack.id });
                 }
 
             } catch (e) {
-                console.error("Error saving track", e);
-                setError("Error al guardar el recorrido.");
+                console.error("CRITICAL ERROR saving track", e);
+                setError("Error al guardar el recorrido. Se intentó guardar localmente.");
+                // Even if it failed, we might want to keep the active track? 
+                // For now, if offline save fails, it's a critical storage error.
             }
-        } else if (!save && currentTrack) {
-            // Discarding: also remove from active store
-            await deleteActiveTrack(currentTrack.id);
+        } else if (!save && trackToSave) {
+            // Discarding: remove from active store
+            await deleteActiveTrack(trackToSave.id);
+            console.log("Track discarded and removed from active store.");
         }
 
         setCurrentTrack(null);

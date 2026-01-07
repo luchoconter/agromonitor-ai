@@ -72,19 +72,20 @@ export const TracksView: React.FC = () => {
 
     return (
         <div className="max-w-7xl mx-auto pb-20">
-            <div className="flex justify-between items-center mb-6">
+            {/* Header Responsive */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     <Map className="w-6 h-6 text-agro-600" />
                     Historial de Rutas GPS
                 </h2>
-                <div className="relative">
+                <div className="relative w-full md:w-auto">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <input
                         type="text"
                         placeholder="Buscar..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-agro-500 outline-none w-full sm:w-64"
+                        className="pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-agro-500 outline-none w-full md:w-64"
                     />
                 </div>
             </div>
@@ -92,96 +93,176 @@ export const TracksView: React.FC = () => {
             {isLoading ? (
                 <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-agro-600" /></div>
             ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-semibold uppercase text-xs">
-                            <tr>
-                                <th className="px-4 py-3 whitespace-nowrap">Fecha / Hora</th>
-                                <th className="px-4 py-3 whitespace-nowrap">Ubicación</th>
-                                <th className="px-4 py-3 whitespace-nowrap">Usuario</th>
-                                <th className="px-4 py-3 text-center whitespace-nowrap">Duración</th>
-                                <th className="px-4 py-3 text-center whitespace-nowrap">Distancia</th>
-                                <th className="px-4 py-3 text-center whitespace-nowrap">Detenciones</th>
-                                <th className="px-4 py-3 w-1/3">Detalle</th>
-                                <th className="px-4 py-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
-                            {filteredTracks.map(track => {
-                                const companyName = data.companies.find(c => c.id === track.companyId)?.name || 'Empresa desc.';
-                                const fieldNames = track.fieldIds?.map(fid => data.fields.find(f => f.id === fid)?.name).join(', ') || 'Campo desc.';
+                <>
+                    {/* MOBILE VIEW cards */}
+                    <div className="grid grid-cols-1 gap-4 md:hidden">
+                        {filteredTracks.map(track => {
+                            const companyName = data.companies.find(c => c.id === track.companyId)?.name || 'Empresa desc.';
+                            const fieldNames = track.fieldIds?.map(fid => data.fields.find(f => f.id === fid)?.name).join(', ') || 'Campo desc.';
+                            const stops = calculateStops(track.points || []).length;
 
-                                return (
-                                    <tr key={track.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                        <td className="px-4 py-3 whitespace-nowrap">
+                            return (
+                                <div key={track.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 space-y-3">
+                                    {/* Header Row: Date & Actions */}
+                                    <div className="flex justify-between items-start">
+                                        <div>
                                             <div className="font-bold text-gray-900 dark:text-white">{new Date(track.startTime).toLocaleDateString()}</div>
                                             <div className="text-xs text-gray-500">{new Date(track.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="font-medium text-gray-800 dark:text-gray-200">{companyName}</div>
-                                            <div className="text-xs text-gray-500 truncate max-w-[150px]" title={fieldNames}>{fieldNames}</div>
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
-                                                    {track.userName?.charAt(0)}
-                                                </div>
-                                                <span className="text-gray-700 dark:text-gray-300">{track.userName}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                                            <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-mono">
-                                                {formatDuration(track.startTime, track.endTime)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                                            <span className="font-mono font-bold">{track.distance.toFixed(2)} km</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                                            <div className="flex items-center justify-center gap-1 text-orange-600 dark:text-orange-400">
-                                                <PauseCircle className="w-4 h-4" />
-                                                <span className="font-mono font-bold">{calculateStops(track.points || []).length}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {track.name && <div className="font-bold text-gray-800 dark:text-gray-200">{track.name}</div>}
-                                            {track.notes ? (
-                                                <div className="text-xs text-gray-500 italic truncate max-w-[300px]" title={track.notes}>{track.notes}</div>
-                                            ) : <span className="text-xs text-gray-400">-</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setSelectedTrack(track)}
+                                                className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg border border-blue-100 dark:border-blue-900/30"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {currentUser?.role === 'admin' && (
                                                 <button
-                                                    onClick={() => setSelectedTrack(track)}
-                                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                    title="Ver en mapa"
+                                                    onClick={() => setTrackToDelete(track.id)}
+                                                    className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg border border-red-100 dark:border-red-900/30"
                                                 >
-                                                    <Eye className="w-4 h-4" />
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
-                                                {currentUser?.role === 'admin' && (
-                                                    <button
-                                                        onClick={() => setTrackToDelete(track.id)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                        title="Eliminar Ruta"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Content Info */}
+                                    <div className="pl-2 border-l-2 border-agro-500">
+                                        <div className="font-medium text-gray-800 dark:text-gray-200 text-sm">{companyName}</div>
+                                        <div className="text-xs text-gray-500">{fieldNames}</div>
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-3 gap-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
+                                        <div className="text-center">
+                                            <span className="block text-[10px] text-gray-500 uppercase">Distancia</span>
+                                            <span className="font-mono font-bold text-gray-800 dark:text-white">{track.distance.toFixed(2)} km</span>
+                                        </div>
+                                        <div className="text-center border-l border-gray-200 dark:border-gray-700">
+                                            <span className="block text-[10px] text-gray-500 uppercase">Duración</span>
+                                            <span className="font-mono font-bold text-gray-800 dark:text-white text-xs">{formatDuration(track.startTime, track.endTime)}</span>
+                                        </div>
+                                        <div className="text-center border-l border-gray-200 dark:border-gray-700">
+                                            <span className="block text-[10px] text-gray-500 uppercase">Paradas</span>
+                                            <span className="font-mono font-bold text-orange-600 dark:text-orange-400">{stops}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Footer: User & Notes */}
+                                    <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100 dark:border-gray-700">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-bold text-gray-600 dark:text-gray-300">
+                                                {track.userName?.charAt(0)}
                                             </div>
+                                            <span className="text-gray-600 dark:text-gray-400">{track.userName}</span>
+                                        </div>
+                                        {track.name && (
+                                            <span className="font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{track.name}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {filteredTracks.length === 0 && (
+                            <div className="text-center py-10 text-gray-400 italic bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                                No hay rutas registradas.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* DESKTOP VIEW Table */}
+                    <div className="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 font-semibold uppercase text-xs">
+                                <tr>
+                                    <th className="px-4 py-3 whitespace-nowrap">Fecha / Hora</th>
+                                    <th className="px-4 py-3 whitespace-nowrap">Ubicación</th>
+                                    <th className="px-4 py-3 whitespace-nowrap">Usuario</th>
+                                    <th className="px-4 py-3 text-center whitespace-nowrap">Duración</th>
+                                    <th className="px-4 py-3 text-center whitespace-nowrap">Distancia</th>
+                                    <th className="px-4 py-3 text-center whitespace-nowrap">Detenciones</th>
+                                    <th className="px-4 py-3 w-1/3">Detalle</th>
+                                    <th className="px-4 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+                                {filteredTracks.map(track => {
+                                    const companyName = data.companies.find(c => c.id === track.companyId)?.name || 'Empresa desc.';
+                                    const fieldNames = track.fieldIds?.map(fid => data.fields.find(f => f.id === fid)?.name).join(', ') || 'Campo desc.';
+
+                                    return (
+                                        <tr key={track.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="font-bold text-gray-900 dark:text-white">{new Date(track.startTime).toLocaleDateString()}</div>
+                                                <div className="text-xs text-gray-500">{new Date(track.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="font-medium text-gray-800 dark:text-gray-200">{companyName}</div>
+                                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={fieldNames}>{fieldNames}</div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
+                                                        {track.userName?.charAt(0)}
+                                                    </div>
+                                                    <span className="text-gray-700 dark:text-gray-300">{track.userName}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-mono">
+                                                    {formatDuration(track.startTime, track.endTime)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                <span className="font-mono font-bold">{track.distance.toFixed(2)} km</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                <div className="flex items-center justify-center gap-1 text-orange-600 dark:text-orange-400">
+                                                    <PauseCircle className="w-4 h-4" />
+                                                    <span className="font-mono font-bold">{calculateStops(track.points || []).length}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {track.name && <div className="font-bold text-gray-800 dark:text-gray-200">{track.name}</div>}
+                                                {track.notes ? (
+                                                    <div className="text-xs text-gray-500 italic truncate max-w-[300px]" title={track.notes}>{track.notes}</div>
+                                                ) : <span className="text-xs text-gray-400">-</span>}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setSelectedTrack(track)}
+                                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                        title="Ver en mapa"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    {currentUser?.role === 'admin' && (
+                                                        <button
+                                                            onClick={() => setTrackToDelete(track.id)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                            title="Eliminar Ruta"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {filteredTracks.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="text-center py-10 text-gray-400 italic">
+                                            No se encontraron rutas registradas.
                                         </td>
                                     </tr>
-                                );
-                            })}
-                            {filteredTracks.length === 0 && (
-                                <tr>
-                                    <td colSpan={7} className="text-center py-10 text-gray-400 italic">
-                                        No se encontraron rutas registradas.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             <Modal isOpen={!!trackToDelete} onClose={() => setTrackToDelete(null)} title="Eliminar Ruta">

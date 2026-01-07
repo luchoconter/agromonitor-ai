@@ -280,24 +280,24 @@ export const HistoryView: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto h-full flex flex-col">
-            <div className="flex justify-between items-center mb-4 shrink-0">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Historial</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 shrink-0">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Historial de Muestreos</h2>
 
-                <div className="flex gap-2">
-                    {/* IMPORT BUTTON */}
-                    <label className={`px-3 py-1.5 h-auto text-xs font-bold rounded-lg border border-agro-200 dark:border-agro-800 bg-agro-50 dark:bg-agro-900/30 text-agro-700 dark:text-agro-400 cursor-pointer hover:bg-agro-100 transition-colors flex items-center ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    {/* IMPORT BUTTON - Hide on very small screens or make icon only? Keeping full for now but wrapping */}
+                    <label className={`px-3 py-1.5 h-auto text-xs font-bold rounded-lg border border-agro-200 dark:border-agro-800 bg-agro-50 dark:bg-agro-900/30 text-agro-700 dark:text-agro-400 cursor-pointer hover:bg-agro-100 transition-colors flex items-center justify-center flex-1 md:flex-none ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
                         {isImporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                        IMPORTAR EXCEL
+                        <span className="hidden sm:inline">IMPORTAR</span><span className="sm:hidden">IMPORTAR</span>
                         <input type="file" accept=".xlsx, .xls" onChange={handleImportExcel} className="hidden" disabled={isImporting} />
                     </label>
 
-                    <Button variant="secondary" onClick={handleExportExcel} className="px-3 py-1.5 h-auto text-xs font-bold flex" disabled={filteredHistory.length === 0}>
-                        <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> EXPORTAR
+                    <Button variant="secondary" onClick={handleExportExcel} className="px-3 py-1.5 h-auto text-xs font-bold flex items-center justify-center flex-1 md:flex-none" disabled={filteredHistory.length === 0}>
+                        <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> <span className="hidden sm:inline">EXPORTAR</span><span className="sm:hidden">EXP</span>
                     </Button>
 
-                    <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg">
-                        <button onClick={() => setIsMapView(false)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center ${!isMapView ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}><List className="w-3 h-3 mr-1.5" /> LISTADO</button>
-                        <button onClick={() => setIsMapView(true)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center ${isMapView ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}><MapIcon className="w-3 h-3 mr-1.5" /> MAPA</button>
+                    <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg flex-1 md:flex-none justify-center">
+                        <button onClick={() => setIsMapView(false)} className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${!isMapView ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}><List className="w-3 h-3 mr-1.5" /> LISTADO</button>
+                        <button onClick={() => setIsMapView(true)} className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${isMapView ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}><MapIcon className="w-3 h-3 mr-1.5" /> MAPA</button>
                     </div>
                 </div>
             </div>
