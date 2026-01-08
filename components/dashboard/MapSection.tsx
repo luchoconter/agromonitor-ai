@@ -617,17 +617,25 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
         // --- TRACKS RENDERING (OVERLAY) ---
         // Render tracks if explicitly enabled, regardless of mode (usually Status mode)
         if (showTracks && tracks.length > 0) {
+            // Pre-calculate dates for consistent coloring matching legend
+            const uniqueDates = Array.from(new Set(tracks.map(t => getShortDate(t.startTime)))).sort();
+
             tracks.forEach(track => {
                 if (!track.points || track.points.length === 0) return;
+
+                // Determine color based on date index
+                const dateStr = getShortDate(track.startTime);
+                const dateIndex = uniqueDates.indexOf(dateStr);
+                const trackColor = DATE_COLORS[dateIndex % DATE_COLORS.length] || TRACK_COLOR;
 
                 // 1. Draw Polyline
                 const latlngs = track.points.map(p => [p.lat, p.lng] as [number, number]);
                 const polyline = L.polyline(latlngs, {
-                    color: TRACK_COLOR,
-                    weight: 4,
-                    opacity: 0.8,
+                    color: trackColor,
+                    weight: 4, // Slightly thicker for visibility
+                    opacity: 0.9,
                     lineJoin: 'round',
-                    dashArray: '8, 8'
+                    // dashArray: '8, 8' // Removed dashed line for solid, more visible line
                 }).addTo(map);
 
                 // Tooltip
@@ -794,8 +802,22 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                         <div className="h-px bg-gray-200 dark:bg-gray-700 my-2" />
                         <h4 className="text-[10px] font-bold uppercase text-gray-500 mb-1">Recorridos</h4>
                         <div className="flex flex-col gap-1">
-                            <LegendItem label="Recorrido (7d)" color="#8b5cf6" />
-                            <div className="flex items-center text-xs text-gray-700 dark:text-gray-300 mt-1">
+                            {(() => {
+                                // Calculate unique dates and assign colors
+                                const uniqueDates = Array.from(new Set(tracks.map(t => getShortDate(t.startTime)))).sort();
+
+                                // Return legend items
+                                if (uniqueDates.length > 0) {
+                                    return uniqueDates.map((dateStr, index) => {
+                                        const color = DATE_COLORS[index % DATE_COLORS.length];
+                                        return <LegendItem key={dateStr} label={dateStr} color={color} />;
+                                    });
+                                } else {
+                                    return <div className="text-xs text-gray-400 italic">Sin recorridos visibles</div>;
+                                }
+                            })()}
+
+                            <div className="flex items-center text-xs text-gray-700 dark:text-gray-300 mt-1 border-t border-gray-100 dark:border-gray-700 pt-1">
                                 <span className="px-1 py-0.5 bg-orange-500 text-white rounded text-[9px] font-bold mr-1.5 shadow-sm">15m</span>
                                 Parada (&gt;1min)
                             </div>
@@ -803,7 +825,7 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
                     </>
                 )}
             </div>
-        </div>
+        </div >
     );
 
     if (isMaximized) {
