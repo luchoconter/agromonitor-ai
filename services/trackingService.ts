@@ -87,12 +87,29 @@ let wakeLock: any = null;
 export const requestWakeLock = async (): Promise<boolean> => {
     try {
         if ('wakeLock' in navigator) {
+            // Release previous lock if exists
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                } catch (e) {
+                    // Ignore if already released
+                }
+            }
+            
             wakeLock = await (navigator as any).wakeLock.request('screen');
+            
+            // Listen for automatic release (e.g., when app goes to background)
+            wakeLock.addEventListener('release', () => {
+                console.log('Wake Lock released automatically');
+                wakeLock = null;
+            });
+            
             console.log('Wake Lock is active');
             return true;
         }
     } catch (err) {
         console.error(`${err.name}, ${err.message}`);
+        wakeLock = null;
     }
     return false;
 };

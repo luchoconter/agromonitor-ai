@@ -38,6 +38,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const watchIdRef = useRef<number | null>(null);
     const lastPointRef = useRef<TrackPoint | null>(null);
+    const lastPointTimeRef = useRef<number | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Timer Logic: Use Date.now() delta to calculate elapsed time accurately
@@ -106,25 +107,15 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         const handleVisibilityChange = async () => {
             if (document.visibilityState === 'visible' && isTracking && !isPaused) {
                 console.log("App foregrounded, ensuring WakeLock and GPS...");
+                
+                // Re-request WakeLock (it was automatically released in background)
                 await requestWakeLock();
 
-                // If the app was backgrounded for a long time, the watch might have been killed.
-                // We re-affirm the watch.
-                if (watchIdRef.current === null) {
-                    console.log("WatchID lost, restarting GPS...");
-                    startGpsWatch();
-                } else {
-                    // Force a single update to check if still alive
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => console.log("GPS Alive check:", pos.coords.latitude),
-                        () => {
-                            console.warn("GPS appears dead, restarting...");
-                            startGpsWatch();
-                        },
-                        { timeout: 5000, maximumAge: 0 }
-                    );
-                }
+                // Restart GPS watch to ensure it's running properly
+                // This prevents duplicates and handles cases where watch died in background
+                await startGpsWatch();
             }
+            // Note: We don't pause GPS when going to background, it continues capturing points
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -153,6 +144,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         setElapsedTime(0);
         setIsPaused(false);
         lastPointRef.current = null;
+        lastPointTimeRef.current = null;
 
         const newTrack: TrackSession = {
             id: generateUUID(),
@@ -184,9 +176,10 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
         const ok = await requestWakeLock();
         if (!ok) console.warn("No se pudo activar WakeLock");
 
-        // Clear existing if any to avoid dupes
+        // Always clear existing watch to prevent duplicates
         if (watchIdRef.current !== null) {
             navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
         }
 
         watchIdRef.current = navigator.geolocation.watchPosition(
@@ -206,21 +199,30 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                     heading
                 };
 
-                // OPTIMIZATION: Smart Distance Filter
-                // Dist min: 7 meters (was 10m). Better resolution for walking.
+                // OPTIMIZATION: Hybrid Distance + Time Filter
+                // Save if: moved > 5m OR 10+ seconds passed since last point
                 let shouldSave = false;
                 let dist = 0;
 
                 if (!lastPointRef.current) {
+                    // First point always saved
                     shouldSave = true;
                 } else {
+                    // Calculate distance from last saved point
                     dist = calculateDistance(
                         lastPointRef.current.lat,
                         lastPointRef.current.lng,
                         latitude,
                         longitude
                     );
-                    if (dist > 0.007) { // 7 meters min
+                    
+                    // Calculate time since last saved point
+                    const timeSinceLastPoint = lastPointTimeRef.current 
+                        ? (timestamp - lastPointTimeRef.current) / 1000 // seconds
+                        : 0;
+
+                    // Save if moved > 5 meters OR 10+ seconds passed
+                    if (dist > 0.005 || timeSinceLastPoint >= 10) {
                         shouldSave = true;
                     }
                 }
@@ -244,6 +246,7 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                         setDistanceTraveled(prev => prev + dist);
                     }
                     lastPointRef.current = newPoint;
+                    lastPointTimeRef.current = timestamp;
 
                     // PERSIST ACTIVE TRACK CONTINUOUSLY
                     if (updatedTrack) {
