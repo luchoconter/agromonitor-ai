@@ -87,7 +87,7 @@ export const LoginView: React.FC = () => {
                     <div className="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4">
                         <Sprout className="w-8 h-8 text-agro-600" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white">Ing Marcon V1.2</h1>
+                    <h1 className="text-2xl font-bold text-white">Ing Arg. Msc. Enrique A Marcon (v.1.1)</h1>
                     <p className="text-agro-100 mt-2 text-sm">Sistema de Consultoría Agronómica</p>
                     <div className="absolute top-4 right-4">
                         <button onClick={toggleTheme} className="p-2 rounded-full text-white/80 hover:bg-white/10 transition-colors">

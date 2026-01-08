@@ -83,7 +83,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (view === 'manage-team') return 'Gestión de Equipo y Clientes';
     if (view === 'structure-hub') return 'Empresas y Lotes';
     if (view === 'history') return 'Historial Muestreos';
-    if (view === 'analytics') return 'Dashboard de Cierres';
+    if (view === 'analytics') return 'Tablero de Cierres';
     if (view === 'recipes') return 'Recetas Agronómicas';
     if (view === 'manage-crops') return 'Catálogo de Cultivos';
     if (view === 'manage-pests') return 'Catálogo de Plagas';
@@ -91,9 +91,9 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (view === 'manage-agrochemicals') return 'Catálogo de Insumos';
     if (view === 'manage-tasks') return 'Catálogo de Labores';
     if (view === 'crop-assignments') return 'Asignación de Cultivos';
-    if (view === 'budget-manager') return 'Gestión de Presupuestos';
+    if (view === 'budget-manager') return 'Gestión de Presupuestos y Costos';
     if (view.startsWith('manage-')) return 'Gestión';
-    return 'Ing Marcon V1.2';
+    return 'Ing Arg. Msc. Enrique A Marcon (v.1.1)';
   };
 
   return (

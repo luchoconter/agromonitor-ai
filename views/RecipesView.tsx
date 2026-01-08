@@ -212,7 +212,7 @@ export const RecipesView: React.FC = () => {
     }, [selectedRecipeIds, data.prescriptions, data.plots, data.agrochemicals]);
 
     const copyShoppingListToClipboard = () => {
-        let text = `🛒 LISTA DE COMPRAS ING MARCON V1.2\n`;
+        let text = `🛒 LISTA DE COMPRAS Ing Arg. Msc. Enrique A Marcon (v.1.1)\n`;
         text += `Para ${selectedRecipeIds.length} recetas seleccionadas\n\n`;
 
         Object.entries(calculateShoppingList).forEach(([type, items]) => {
@@ -255,7 +255,7 @@ export const RecipesView: React.FC = () => {
             doc.setFontSize(10);
             doc.setFont("helvetica", "normal");
             doc.text(`Fecha: ${recipeDate}`, pageWidth - margin, 15, { align: 'right' });
-            doc.text("Ing Marcon V1.2", pageWidth - margin, 22, { align: 'right' });
+            doc.text("Ing Arg. Msc. Enrique A Marcon (v.1.1)", pageWidth - margin, 22, { align: 'right' });
 
             // Context Box
             yPos = 40;
