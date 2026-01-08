@@ -23,8 +23,13 @@ export const saveTrack = async (track: TrackSession): Promise<string> => {
 
     const { id, ...trackData } = track;
 
+    // Sanitize: Remove undefined values (Firebase doesn't accept them)
+    const cleanData = Object.fromEntries(
+        Object.entries(trackData).filter(([_, v]) => v !== undefined)
+    );
+
     const docRef = await addDoc(collection(db, TRACKS_COLLECTION), {
-        ...trackData,
+        ...cleanData,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
     });

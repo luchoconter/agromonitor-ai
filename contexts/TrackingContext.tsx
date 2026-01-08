@@ -303,8 +303,8 @@ export const TrackingProvider: React.FC<{ children: ReactNode }> = ({ children }
                 endTime: new Date().toISOString(),
                 status: 'completed',
                 distance: distanceTraveled,
-                name: name || undefined,
-                notes: notes || undefined
+                ...(name && { name }),
+                ...(notes && { notes })
             };
 
             try {
