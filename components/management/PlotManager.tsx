@@ -306,12 +306,12 @@ export const PlotManager: React.FC<PlotManagerProps> = ({ plots, fields, compani
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col h-full">
             {/* Header */}
-            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
+            <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 bg-gray-50/50 dark:bg-gray-900/50">
                 <div>
                     <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Lotes</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{plots.length} registros</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-200 dark:border-gray-700 sm:justify-end">
                     {/* View Toggle */}
                     <Button
                         variant="outline"
