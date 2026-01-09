@@ -31,10 +31,12 @@ import { RecipesView } from './views/RecipesView';
 import { NotificationManager } from './components/NotificationManager';
 import { BudgetManager } from './components/finance/BudgetManager';
 import { TracksView } from './views/TracksView';
+import { useShareTarget } from './hooks/useShareTarget';
 
 // --- Main Inner App (Access to Contexts) ---
 const MainApp: React.FC = () => {
   const { currentUser } = useAuth();
+  useShareTarget(); // Handle shared files
   const { data, isLoading: isLoadingData, connectionError, userCompanies, dataOwnerId } = useData();
   const { view, setView } = useUI();
 
