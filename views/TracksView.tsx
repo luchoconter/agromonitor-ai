@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import * as Storage from '../services/storageService';
 import { TrackSession } from '../types/tracking';
 import { calculateStops } from '../services/trackingService';
-import { Trash2, Map, Search, AlertTriangle, Loader2, PauseCircle, Eye } from 'lucide-react';
+import { Trash2, Map, Search, AlertTriangle, Loader2, PauseCircle, Eye, Upload } from 'lucide-react';
+import { parseGpxAndCreateSession } from '../utils/gpxParser';
 import { Modal, Button } from '../components/UI';
 import { MapSection } from '../components/dashboard/MapSection';
 
@@ -14,8 +15,19 @@ export const TracksView: React.FC = () => {
     const [tracks, setTracks] = useState<TrackSession[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
     const [selectedTrack, setSelectedTrack] = useState<TrackSession | null>(null);
+    const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Import State
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [pendingImportTrack, setPendingImportTrack] = useState<TrackSession | null>(null);
+    const [importData, setImportData] = useState({
+        name: '',
+        notes: '',
+        companyId: '',
+        fieldIds: [] as string[]
+    });
 
     // Initial Load
     useEffect(() => {
@@ -43,6 +55,81 @@ export const TracksView: React.FC = () => {
             setTrackToDelete(null);
         } catch (error) {
             console.error("Error deleting track", error);
+        }
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Reset input value to allow selecting the same file again if needed
+        event.target.value = '';
+
+        if (!currentUser) {
+            alert("Debes estar logueado para importar.");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const trackSession = await parseGpxAndCreateSession(file, {
+                id: currentUser.id,
+                name: currentUser.name || currentUser.email || 'Desconocido',
+                email: currentUser.email || ''
+            });
+
+            setPendingImportTrack(trackSession);
+            setImportData({
+                name: trackSession.name || '',
+                notes: trackSession.notes || '',
+                companyId: '',
+                fieldIds: []
+            });
+            setIsImportModalOpen(true);
+
+        } catch (error) {
+            console.error("Error importing GPX", error);
+            alert("Error al importar archivo GPX: " + (error as Error).message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!pendingImportTrack) return;
+        if (!importData.companyId) {
+            alert("Por favor selecciona una empresa.");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const finalTrack = {
+                ...pendingImportTrack,
+                name: importData.name,
+                notes: importData.notes,
+                companyId: importData.companyId,
+                fieldIds: importData.fieldIds,
+                synced: true // Mark as synced since it came from external and straight to DB
+            };
+
+            const newId = await Storage.saveTrack(finalTrack);
+            finalTrack.id = newId;
+
+            setTracks(prev => [finalTrack, ...prev]);
+
+            setIsImportModalOpen(false);
+            setPendingImportTrack(null);
+            alert("Ruta importada correctamente.");
+        } catch (error) {
+            console.error("Error saving track", error);
+            alert("Error al guardar la ruta importada.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -87,6 +174,22 @@ export const TracksView: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-agro-500 outline-none w-full md:w-64"
                     />
+                </div>
+                <div className="flex gap-2 w-full md:w-auto">
+                    <input
+                        type="file"
+                        accept=".gpx"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
+                    <button
+                        onClick={handleImportClick}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium w-full md:w-auto"
+                    >
+                        <Upload className="w-4 h-4" />
+                        Importar GPX
+                    </button>
                 </div>
             </div>
 
@@ -293,6 +396,84 @@ export const TracksView: React.FC = () => {
                 </div>
                 <div className="mt-4 flex justify-end">
                     <Button onClick={() => setSelectedTrack(null)}>Cerrar</Button>
+                </div>
+            </Modal>
+
+            {/* Import Modal */}
+            <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Importar Ruta GPX">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la Ruta</label>
+                        <input
+                            type="text"
+                            value={importData.name}
+                            onChange={(e) => setImportData({ ...importData, name: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Empresa</label>
+                        <select
+                            value={importData.companyId}
+                            onChange={(e) => setImportData({ ...importData, companyId: e.target.value, fieldIds: [] })}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        >
+                            <option value="">Selecciona una empresa</option>
+                            {data.companies.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {importData.companyId && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Campos (Lotes)</label>
+                            <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md p-2 bg-gray-50 dark:bg-gray-900/50">
+                                {data.fields
+                                    .filter(f => f.companyId === importData.companyId)
+                                    .map(field => (
+                                        <div key={field.id} className="flex items-center gap-2 mb-1">
+                                            <input
+                                                type="checkbox"
+                                                id={`field-${field.id}`}
+                                                checked={importData.fieldIds.includes(field.id)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setImportData(prev => ({
+                                                        ...prev,
+                                                        fieldIds: checked
+                                                            ? [...prev.fieldIds, field.id]
+                                                            : prev.fieldIds.filter(id => id !== field.id)
+                                                    }));
+                                                }}
+                                                className="rounded border-gray-300 text-agro-600 focus:ring-agro-500"
+                                            />
+                                            <label htmlFor={`field-${field.id}`} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                {field.name}
+                                            </label>
+                                        </div>
+                                    ))}
+                                {data.fields.filter(f => f.companyId === importData.companyId).length === 0 && (
+                                    <p className="text-sm text-gray-500 italic">No hay campos disponibles.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</label>
+                        <textarea
+                            value={importData.notes}
+                            onChange={(e) => setImportData({ ...importData, notes: e.target.value })}
+                            rows={3}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="ghost" onClick={() => setIsImportModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleConfirmImport} disabled={!importData.companyId}>Confirmar Importación</Button>
+                    </div>
                 </div>
             </Modal>
         </div>
