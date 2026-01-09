@@ -1,17 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
 import { saveTrack } from '../services/repositories/trackRepository';
 import { TrackSession, TrackPoint } from '../types/tracking';
 
 export const useShareTarget = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
     const { currentUser } = useAuth();
     const { showNotification } = useUI();
     const processingRef = useRef(false);
 
     useEffect(() => {
+        // Use native URLSearchParams since we don't have react-router-dom
+        const searchParams = new URLSearchParams(window.location.search);
         const action = searchParams.get('action');
 
         if (action === 'import_shared' && !processingRef.current) {
@@ -104,17 +104,17 @@ export const useShareTarget = () => {
                     showNotification('Error al importar la ruta.', 'error');
                 } finally {
                     processingRef.current = false;
-                    // Clear the param
-                    setSearchParams(params => {
-                        params.delete('action');
-                        return params;
-                    });
+                    // Clear the param using history API
+                    const newParams = new URLSearchParams(window.location.search);
+                    newParams.delete('action');
+                    const newUrl = window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : '');
+                    window.history.replaceState({}, '', newUrl);
                 }
             };
 
             handleImport();
         }
-    }, [searchParams, currentUser, setSearchParams, showNotification]);
+    }, [currentUser, showNotification]);
 };
 
 // Helper for distance (Haversine simplified or simple euclidean for short dists, but better use calc)
