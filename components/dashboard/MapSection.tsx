@@ -739,7 +739,7 @@ export const MapSection = forwardRef<HTMLDivElement, MapSectionProps>(({
     };
 
     const mapContent = (
-        <div ref={wrapperRef} className={`bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-all duration-300 ${isMaximized ? 'fixed inset-0 z-[99999] h-screen w-screen rounded-none border-none m-0' : 'relative z-0 h-[400px]'}`}>
+        <div ref={wrapperRef} className={`bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-all duration-300 ${isMaximized ? 'fixed inset-0 z-[200000] h-screen w-screen rounded-none border-none m-0' : 'relative z-0 h-[400px]'}`}>
             <div ref={mapDivRef} className="w-full h-full rounded-lg z-0" />
             <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
                 <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg shadow-md border border-gray-200 dark:border-gray-700">

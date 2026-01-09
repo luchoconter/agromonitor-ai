@@ -78,3 +78,17 @@ export const getTracks = async (companyId?: string, userId?: string, dateFrom?: 
 export const deleteTrack = async (trackId: string): Promise<void> => {
     await deleteDoc(doc(db, TRACKS_COLLECTION, trackId));
 };
+
+export const updateTrack = async (trackId: string, updates: Partial<TrackSession>): Promise<void> => {
+    const { id, ...cleanUpdates } = updates; // Remove ID to avoid overwriting it (though Firestore ignores it if not in doc path)
+
+    // Sanitize
+    const finalUpdates = Object.fromEntries(
+        Object.entries(cleanUpdates).filter(([_, v]) => v !== undefined)
+    );
+
+    await updateDoc(doc(db, TRACKS_COLLECTION, trackId), {
+        ...finalUpdates,
+        updatedAt: Timestamp.now()
+    });
+};

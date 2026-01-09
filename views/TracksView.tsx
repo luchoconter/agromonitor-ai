@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import * as Storage from '../services/storageService';
 import { TrackSession } from '../types/tracking';
 import { calculateStops } from '../services/trackingService';
-import { Trash2, Map, Search, AlertTriangle, Loader2, PauseCircle, Eye, Upload } from 'lucide-react';
+import { Trash2, Map, Search, AlertTriangle, Loader2, PauseCircle, Eye, Upload, Pencil } from 'lucide-react';
 import { parseGpxAndCreateSession } from '../utils/gpxParser';
 import { Modal, Button } from '../components/UI';
 import { MapSection } from '../components/dashboard/MapSection';
@@ -17,6 +17,7 @@ export const TracksView: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTrack, setSelectedTrack] = useState<TrackSession | null>(null);
     const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+    const [editingTrack, setEditingTrack] = useState<TrackSession | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     // Import State
@@ -133,6 +134,48 @@ export const TracksView: React.FC = () => {
         }
     };
 
+    const handleEditClick = (track: TrackSession) => {
+        setImportData({
+            name: track.name || '',
+            notes: track.notes || '',
+            companyId: track.companyId || '',
+            fieldIds: track.fieldIds || []
+        });
+        setEditingTrack(track);
+    };
+
+    const handleConfirmEdit = async () => {
+        if (!editingTrack) return;
+        if (!importData.companyId) { // Reusing importData state for simplicity as "FormData"
+            alert("Por favor selecciona una empresa.");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await Storage.updateTrack(editingTrack.id, {
+                name: importData.name,
+                notes: importData.notes,
+                companyId: importData.companyId,
+                fieldIds: importData.fieldIds
+            });
+
+            setTracks(prev => prev.map(t =>
+                t.id === editingTrack.id
+                    ? { ...t, name: importData.name, notes: importData.notes, companyId: importData.companyId, fieldIds: importData.fieldIds }
+                    : t
+            ));
+
+            setEditingTrack(null);
+            alert("Ruta actualizada correctamente.");
+        } catch (error) {
+            console.error("Error updating track", error);
+            alert("Error al actualizar la ruta.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const formatDuration = (start: string, end?: string) => {
         if (!end) return '-';
         const diff = new Date(end).getTime() - new Date(start).getTime();
@@ -219,6 +262,12 @@ export const TracksView: React.FC = () => {
                                             >
                                                 <Eye className="w-4 h-4" />
                                             </button>
+                                            <button
+                                                onClick={() => handleEditClick(track)}
+                                                className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 rounded-lg border border-yellow-100 dark:border-yellow-900/30"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
                                             {currentUser?.role === 'admin' && (
                                                 <button
                                                     onClick={() => setTrackToDelete(track.id)}
@@ -285,8 +334,8 @@ export const TracksView: React.FC = () => {
                                     <th className="px-4 py-3 text-center whitespace-nowrap">Duración</th>
                                     <th className="px-4 py-3 text-center whitespace-nowrap">Distancia</th>
                                     <th className="px-4 py-3 text-center whitespace-nowrap">Detenciones</th>
-                                    <th className="px-4 py-3 w-1/3">Detalle</th>
-                                    <th className="px-4 py-3 text-right">Acciones</th>
+                                    <th className="px-3 py-3 w-1/4">Detalle</th>
+                                    <th className="px-3 py-3 text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
@@ -296,15 +345,15 @@ export const TracksView: React.FC = () => {
 
                                     return (
                                         <tr key={track.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                            <td className="px-3 py-3 whitespace-nowrap">
                                                 <div className="font-bold text-gray-900 dark:text-white">{new Date(track.startTime).toLocaleDateString()}</div>
                                                 <div className="text-xs text-gray-500">{new Date(track.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                            <td className="px-3 py-3 whitespace-nowrap">
                                                 <div className="font-medium text-gray-800 dark:text-gray-200">{companyName}</div>
-                                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={fieldNames}>{fieldNames}</div>
+                                                <div className="text-xs text-gray-500 truncate max-w-[120px]" title={fieldNames}>{fieldNames}</div>
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                            <td className="px-3 py-3 whitespace-nowrap">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
                                                         {track.userName?.charAt(0)}
@@ -312,27 +361,27 @@ export const TracksView: React.FC = () => {
                                                     <span className="text-gray-700 dark:text-gray-300">{track.userName}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                            <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-mono">
                                                     {formatDuration(track.startTime, track.endTime)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                            <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <span className="font-mono font-bold">{track.distance.toFixed(2)} km</span>
                                             </td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                            <td className="px-3 py-3 text-center whitespace-nowrap">
                                                 <div className="flex items-center justify-center gap-1 text-orange-600 dark:text-orange-400">
                                                     <PauseCircle className="w-4 h-4" />
                                                     <span className="font-mono font-bold">{calculateStops(track.points || []).length}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {track.name && <div className="font-bold text-gray-800 dark:text-gray-200">{track.name}</div>}
+                                            <td className="px-3 py-3">
+                                                {track.name && <div className="font-bold text-gray-800 dark:text-gray-200 truncate max-w-[200px]">{track.name}</div>}
                                                 {track.notes ? (
-                                                    <div className="text-xs text-gray-500 italic truncate max-w-[300px]" title={track.notes}>{track.notes}</div>
+                                                    <div className="text-xs text-gray-500 italic truncate max-w-[200px]" title={track.notes}>{track.notes}</div>
                                                 ) : <span className="text-xs text-gray-400">-</span>}
                                             </td>
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-3 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         onClick={() => setSelectedTrack(track)}
@@ -340,6 +389,13 @@ export const TracksView: React.FC = () => {
                                                         title="Ver en mapa"
                                                     >
                                                         <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleEditClick(track)}
+                                                        className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
+                                                        title="Editar Ruta"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
                                                     </button>
                                                     {currentUser?.role === 'admin' && (
                                                         <button
@@ -473,6 +529,83 @@ export const TracksView: React.FC = () => {
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="ghost" onClick={() => setIsImportModalOpen(false)}>Cancelar</Button>
                         <Button onClick={handleConfirmImport} disabled={!importData.companyId}>Confirmar Importación</Button>
+                    </div>
+                </div>
+            </Modal>
+            {/* Edit Modal - Reusing layout logic similar to Import but for Editing */}
+            <Modal isOpen={!!editingTrack} onClose={() => setEditingTrack(null)} title="Editar Ruta">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la Ruta</label>
+                        <input
+                            type="text"
+                            value={importData.name}
+                            onChange={(e) => setImportData({ ...importData, name: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Empresa</label>
+                        <select
+                            value={importData.companyId}
+                            onChange={(e) => setImportData({ ...importData, companyId: e.target.value, fieldIds: [] })}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        >
+                            <option value="">Selecciona una empresa</option>
+                            {data.companies.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {importData.companyId && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Campos (Lotes)</label>
+                            <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md p-2 bg-gray-50 dark:bg-gray-900/50">
+                                {data.fields
+                                    .filter(f => f.companyId === importData.companyId)
+                                    .map(field => (
+                                        <div key={field.id} className="flex items-center gap-2 mb-1">
+                                            <input
+                                                type="checkbox"
+                                                id={`edit-field-${field.id}`}
+                                                checked={importData.fieldIds.includes(field.id)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setImportData(prev => ({
+                                                        ...prev,
+                                                        fieldIds: checked
+                                                            ? [...prev.fieldIds, field.id]
+                                                            : prev.fieldIds.filter(id => id !== field.id)
+                                                    }));
+                                                }}
+                                                className="rounded border-gray-300 text-agro-600 focus:ring-agro-500"
+                                            />
+                                            <label htmlFor={`edit-field-${field.id}`} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                {field.name}
+                                            </label>
+                                        </div>
+                                    ))}
+                                {data.fields.filter(f => f.companyId === importData.companyId).length === 0 && (
+                                    <p className="text-sm text-gray-500 italic">No hay campos disponibles.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</label>
+                        <textarea
+                            value={importData.notes}
+                            onChange={(e) => setImportData({ ...importData, notes: e.target.value })}
+                            rows={3}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-agro-500 focus:ring-agro-500 dark:bg-gray-700 sm:text-sm"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="ghost" onClick={() => setEditingTrack(null)}>Cancelar</Button>
+                        <Button onClick={handleConfirmEdit} disabled={!importData.companyId}>Guardar Cambios</Button>
                     </div>
                 </div>
             </Modal>
