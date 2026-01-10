@@ -56,9 +56,9 @@ export const fetchWeather = async (inputLat: number, inputLng: number): Promise<
     let isFallback = false;
 
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-      console.warn(`Invalid coordinates provided for weather: [${lat}, ${lng}]. Using default (Buenos Aires).`);
-      lat = -34.6037;
-      lng = -58.3816;
+      console.warn(`Invalid coordinates provided for weather: [${lat}, ${lng}]. Using default (Bandera, Santiago del Estero).`);
+      lat = -28.8872;
+      lng = -62.2619;
       isFallback = true;
     }
 
