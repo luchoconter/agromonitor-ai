@@ -69,7 +69,7 @@ const MainApp: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Estructura Agronómica</h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Configura los 4 pilares fundamentales de tu monitoreo.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Configura los 3 pilares fundamentales de tu monitoreo.</p>
         </div>
       </div>
 

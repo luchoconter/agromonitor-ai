@@ -1066,8 +1066,24 @@ export const RecipesView: React.FC = () => {
             {viewMode === 'history' && (
                 <div className="space-y-4 animate-fade-in relative">
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-5 gap-2">
-                        <input type="date" className="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700 text-xs dark:text-white" value={historyFilter.dateFrom} onChange={e => setHistoryFilter({ ...historyFilter, dateFrom: e.target.value })} placeholder="Desde" />
-                        <input type="date" className="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700 text-xs dark:text-white" value={historyFilter.dateTo} onChange={e => setHistoryFilter({ ...historyFilter, dateTo: e.target.value })} placeholder="Hasta" />
+                        <div className="relative group">
+                            <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none transition-opacity ${historyFilter.dateFrom ? 'opacity-0' : 'opacity-100'}`}>Desde</span>
+                            <input
+                                type="date"
+                                className="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700 text-sm text-gray-900 dark:text-white min-h-[42px] focus:ring-2 focus:ring-agro-500 outline-none"
+                                value={historyFilter.dateFrom}
+                                onChange={e => setHistoryFilter({ ...historyFilter, dateFrom: e.target.value })}
+                            />
+                        </div>
+                        <div className="relative group">
+                            <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none transition-opacity ${historyFilter.dateTo ? 'opacity-0' : 'opacity-100'}`}>Hasta</span>
+                            <input
+                                type="date"
+                                className="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700 text-sm text-gray-900 dark:text-white min-h-[42px] focus:ring-2 focus:ring-agro-500 outline-none"
+                                value={historyFilter.dateTo}
+                                onChange={e => setHistoryFilter({ ...historyFilter, dateTo: e.target.value })}
+                            />
+                        </div>
                         <Select label="" options={userCompanies.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => ({ value: c.id, label: c.name }))} value={historyFilter.companyId} onChange={e => setHistoryFilter({ ...historyFilter, companyId: e.target.value, fieldId: '' })} placeholder="Empresa..." className="text-xs py-2" />
                         <Select label="" options={data.fields.filter(f => f.companyId === historyFilter.companyId).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(f => ({ value: f.id, label: f.name }))} value={historyFilter.fieldId} onChange={e => setHistoryFilter({ ...historyFilter, fieldId: e.target.value })} disabled={!historyFilter.companyId} placeholder="Campo..." className="text-xs py-2" />
                         <Button variant="ghost" onClick={() => setHistoryFilter({ companyId: '', fieldId: '', dateFrom: '', dateTo: '' })} className="text-xs">Limpiar</Button>

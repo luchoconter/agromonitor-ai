@@ -98,7 +98,8 @@ export const CropAssignmentsView: React.FC = () => {
         const assignment = data.assignments.find(a => a.plotId === plotId && a.seasonId === selectedSeasonId);
         const crop = data.crops.find(c => c.id === assignment?.cropId);
         return {
-            cropName: crop?.name || 'Sin Asignar'
+            cropName: crop?.name || 'Sin Asignar',
+            originalStand: assignment?.originalStand
         };
     };
 
@@ -164,7 +165,7 @@ export const CropAssignmentsView: React.FC = () => {
                         {visiblePlots.map(plot => {
                             const field = data.fields.find(f => f.id === plot.fieldId);
                             const company = userCompanies.find(c => c.id === (plot.companyId || field?.companyId));
-                            const { cropName } = getAssignmentDetails(plot.id);
+                            const { cropName, originalStand } = getAssignmentDetails(plot.id);
 
                             return (
                                 <div key={plot.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -183,6 +184,11 @@ export const CropAssignmentsView: React.FC = () => {
                                                 </span>
                                             )}
                                             <span>• {plot.hectares} Has</span>
+                                            {originalStand ? (
+                                                <span className="text-agro-600 dark:text-agro-400 font-medium whitespace-nowrap">
+                                                    • Stand: {originalStand.toLocaleString()} Pl/Ha
+                                                </span>
+                                            ) : null}
                                         </div>
                                     </div>
 

@@ -193,10 +193,17 @@ export const TracksView: React.FC = () => {
         }
 
         const term = searchTerm.toLowerCase();
+
+        // Resolve names for search
+        const companyName = data.companies.find(c => c.id === t.companyId)?.name?.toLowerCase() || '';
+        const fieldNames = t.fieldIds?.map(fid => data.fields.find(f => f.id === fid)?.name?.toLowerCase()).join(' ') || '';
+
         return (
             (t.name?.toLowerCase().includes(term)) ||
             (t.userName?.toLowerCase().includes(term)) ||
-            (t.notes?.toLowerCase().includes(term))
+            (t.notes?.toLowerCase().includes(term)) ||
+            (companyName.includes(term)) ||
+            (fieldNames.includes(term))
         );
     });
 

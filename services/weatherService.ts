@@ -48,8 +48,20 @@ export const getWeatherConditionLabel = (code: number): string => {
   return WMO_CODES[code] || 'Desconocido';
 };
 
-export const fetchWeather = async (lat: number, lng: number): Promise<WeatherInfo | null> => {
+export const fetchWeather = async (inputLat: number, inputLng: number): Promise<WeatherInfo | null> => {
   try {
+    // Validate coordinates
+    let lat = inputLat;
+    let lng = inputLng;
+    let isFallback = false;
+
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+      console.warn(`Invalid coordinates provided for weather: [${lat}, ${lng}]. Using default (Buenos Aires).`);
+      lat = -34.6037;
+      lng = -58.3816;
+      isFallback = true;
+    }
+
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=8`;
 
     const response = await fetch(url);

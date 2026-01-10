@@ -135,24 +135,26 @@ export const BudgetManager: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex gap-4 items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <DollarSign className="w-6 h-6 text-green-600" />
-                <h2 className="text-lg font-bold">Gestión de Presupuestos (USD/ha)</h2>
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                    <DollarSign className="w-6 h-6 text-green-600" />
+                    <h2 className="text-lg font-bold">Gestión de Presupuestos (USD/ha)</h2>
+                </div>
 
-                <div className="ml-auto flex gap-2">
+                <div className="flex gap-2 w-full md:w-auto md:ml-auto">
                     <Select
                         label=""
                         options={userCompanies.map(c => ({ value: c.id, label: c.name }))}
                         value={selectedCompanyId}
                         onChange={(e) => setSelectedCompanyId(e.target.value)}
-                        className="w-40"
+                        className="flex-1 md:w-40"
                     />
                     <Select
                         label=""
                         options={data.seasons.map(s => ({ value: s.id, label: s.name }))}
                         value={selectedSeasonId}
                         onChange={(e) => setSelectedSeasonId(e.target.value)}
-                        className="w-32"
+                        className="flex-1 md:w-32"
                     />
                 </div>
             </div>

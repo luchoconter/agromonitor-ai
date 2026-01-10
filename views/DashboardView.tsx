@@ -754,11 +754,53 @@ export const DashboardView: React.FC = () => {
                 yPos += 50;
             }
 
+            // --- 0.6 MAP OVERVIEW (GLOBAL) ---
+            setGenerationProgress('Capturando Mapa de Situación...');
+            setVisualMode('map');
+            setMapColorMode('status');
+            // Wait for map
+            await new Promise(resolve => setTimeout(resolve, 2500));
+
+            if (mapContainerRef.current) {
+                doc.addPage();
+                fillBackground();
+                yPos = 20;
+
+                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("1. MAPA DE CAMPO (SEMAFORIZADO)", 15, yPos);
+                yPos += 10;
+
+                try {
+                    const mapCanvas = await html2canvas(mapContainerRef.current, {
+                        scale: 3, // High resolution
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#111827'
+                    });
+                    const mapImg = mapCanvas.toDataURL('image/jpeg', 0.85);
+                    const mapRatio = mapCanvas.height / mapCanvas.width;
+                    const mapHeight = Math.min((pageWidth - 30) * mapRatio, 160);
+
+                    doc.addImage(mapImg, 'JPEG', 15, yPos, pageWidth - 30, mapHeight);
+                    yPos += mapHeight + 15;
+                } catch (e) {
+                    console.warn("Map capture failed", e);
+                }
+            }
+
+            // Restore Charts mode for next section
+            setVisualMode('charts');
+            setGenerationProgress('Generando Tablas y Gráficos...');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+
             // --- 1. GLOBAL LOT SITUATION (The consolidated table requested) ---
             doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
-            doc.text("1. SITUACIÓN GENERAL DE LOTES", 15, yPos);
+            doc.text("2. SITUACIÓN GENERAL DE LOTES", 15, yPos);
             yPos += 10;
 
             // Table Header
@@ -852,18 +894,18 @@ export const DashboardView: React.FC = () => {
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
                 doc.setFontSize(14);
                 doc.setFont("helvetica", "bold");
-                doc.text("2. EVOLUCIÓN GLOBAL Y PLAGAS", 15, yPos);
+                doc.text("3. EVOLUCIÓN GLOBAL Y PLAGAS", 15, yPos);
                 yPos += 10;
 
                 try {
-                    // Dark mode capture might need style adjustments if chart transparent. 
-                    // Assuming charts render in dark mode on screen first.
                     const canvas = await html2canvas(chartsContainerRef.current, {
-                        scale: 2,
+                        scale: 3, // High resolution
+                        useCORS: true,
+                        allowTaint: true,
                         backgroundColor: '#111827' // Force dark bg
                     });
-                    // Use JPEG with 0.8 quality for better compression
-                    const img = canvas.toDataURL('image/jpeg', 0.8);
+                    // Use JPEG with 0.85 quality for better compression
+                    const img = canvas.toDataURL('image/jpeg', 0.85);
                     doc.addImage(img, 'JPEG', 15, yPos, pageWidth - 30, 80);
                     yPos += 90;
                 } catch (e) {
@@ -877,7 +919,7 @@ export const DashboardView: React.FC = () => {
             doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
             doc.setFontSize(14);
             doc.setFont("helvetica", "bold");
-            doc.text("2. RESUMEN DE ACTIVIDAD POR CAMPO (30 Días)", 15, yPos);
+            doc.text("4. RESUMEN DE ACTIVIDAD POR CAMPO (30 Días)", 15, yPos);
             yPos += 10;
 
             // Table Header
@@ -966,7 +1008,7 @@ export const DashboardView: React.FC = () => {
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
                 doc.setFontSize(14);
                 doc.setFont("helvetica", "bold");
-                doc.text("3. RECETAS PENDIENTES DE APLICACIÓN (GLOBAL)", 15, yPos);
+                doc.text("5. RECETAS PENDIENTES DE APLICACIÓN (GLOBAL)", 15, yPos);
                 yPos += 10;
 
                 allPendingRecipes.forEach(recipe => {
@@ -1003,15 +1045,21 @@ export const DashboardView: React.FC = () => {
 
                     // Products
                     const products = recipe.items.map((i: any) => {
-                        const productName = i.productName || data.agrochemicals.find(a => a.id === i.productId)?.name || 'Producto desconocido';
+                        // Interface uses supplyName, dose, unit.
+                        // Fallback to lookup if supplyName missing (though it should be there per interface)
+                        const productName = i.supplyName || data.agrochemicals.find(a => a.id === i.supplyId)?.name || 'Producto desconocido';
                         return `${productName} (${i.dose} ${i.unit})`;
                     }).join(' + ');
 
                     // Tasks (Labores)
-                    const tasks = recipe.tasks?.map((t: any) => {
-                        const taskName = t.description || data.tasks.find(tk => tk.id === t.taskId)?.name || 'Labor desconocida';
-                        return taskName;
-                    }).join(', ');
+                    // Interface has taskNames: string[] and taskIds: string[]
+                    let tasks = "";
+                    if (recipe.taskNames && recipe.taskNames.length > 0) {
+                        tasks = recipe.taskNames.join(', ');
+                    } else if (recipe.taskIds && recipe.taskIds.length > 0) {
+                        // Fallback lookup if names missing
+                        tasks = recipe.taskIds.map((tid: string) => data.tasks.find(t => t.id === tid)?.name || 'Labor desconocida').join(', ');
+                    }
 
                     const fullContent = products + (tasks ? ` | Labores: ${tasks}` : '') + (recipe.notes ? ` | Nota: ${recipe.notes}` : '');
 
@@ -1486,9 +1534,9 @@ export const DashboardView: React.FC = () => {
                     </div>
                 ) : <div className="hidden md:block"></div>}
 
-                <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+                <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto">
                     {visualMode === 'map' && mapColorMode !== 'status' && (
-                        <div className="flex flex-wrap items-center gap-2 mr-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <div className="flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
                                 <button onClick={() => setShowMapHistory(false)} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${!showMapHistory ? 'bg-gray-100 dark:bg-gray-700 text-agro-600 dark:text-agro-400' : 'text-gray-500'}`}>Actual</button>
                                 <button onClick={() => setShowMapHistory(true)} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${showMapHistory ? 'bg-gray-100 dark:bg-gray-700 text-agro-600 dark:text-agro-400' : 'text-gray-500'}`}>Histórico</button>
