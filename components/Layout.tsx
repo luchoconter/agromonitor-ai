@@ -223,11 +223,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             onNavigate(id);
             setIsMobileMenuOpen(false);
           }}
-          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${currentView === id ? 'bg-agro-50 dark:bg-agro-900/30 text-agro-700 dark:text-agro-400 border-l-4 border-agro-600 dark:border-agro-500' : 'text-gray-600 dark:text-blue-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all text-left mb-1 ${currentView === id
+            ? 'bg-gray-100 dark:bg-gray-700/50 text-gray-900 dark:text-white font-bold shadow-sm'
+            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
         >
-          <Icon className={`w-5 h-5 ${currentView === id ? 'text-agro-600 dark:text-agro-400' : 'text-gray-400 dark:text-blue-300'}`} />
-          <span className="font-medium">{label}</span>
+          <Icon className={`w-5 h-5 transition-colors ${currentView === id ? 'text-agro-600 dark:text-agro-400' : 'text-gray-400 dark:text-gray-500'}`} />
+          <span className={currentView === id ? '' : 'font-medium'}>{label}</span>
         </button>
       );
     };
@@ -259,12 +261,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {currentUser?.role === 'admin' && (
           <>
-            <div className="pt-6 pb-2 px-4"><p className="text-xs font-semibold text-gray-400 dark:text-blue-300 uppercase tracking-wider">Gestión</p></div>
+            <div className="pt-6 pb-2 px-4"><p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Gestión</p></div>
             {renderItem('manage-team', 'Equipo y Clientes', Users)}
             {renderItem('crop-assignments', 'Asignación Cultivos', LayoutList)}
             {renderItem('structure-hub', 'Empresas/Lotes', Layers)}
 
-            <div className="pt-4 pb-2 px-4"><p className="text-xs font-semibold text-gray-400 dark:text-blue-300 uppercase tracking-wider">Catálogos</p></div>
+            <div className="pt-4 pb-2 px-4"><p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Catálogos</p></div>
             {renderItem('manage-seasons', 'Campañas', Calendar)}
             {renderItem('manage-agrochemicals', 'Insumos', FlaskConical)}
             {renderItem('manage-tasks', 'Labores', ListTodo)}

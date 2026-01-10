@@ -251,6 +251,7 @@ export const DashboardView: React.FC = () => {
             };
         }
 
+
         // Fallback: Try to find ANY plot with coordinates in the context
         if (targetFieldId) {
             const plotWithLoc = data.plots.find(p => p.fieldId === targetFieldId && p.lat && p.lng);
@@ -274,8 +275,37 @@ export const DashboardView: React.FC = () => {
 
     const availableFields = useMemo(() => data.fields.filter(f => f.companyId === effectiveCompanyId), [data.fields, effectiveCompanyId]);
 
+    // --- UX IMPROVEMENT: CLEAR FILTERS ---
+    const handleClearFilters = () => {
+        // Reset Field
+        setSelectedFieldId('');
+        // Reset Crop
+        setSelectedCropId('');
+        // Reset Search
+        setSearchTerm('');
+
+        // Reset Dates
+        setDateFrom('');
+        setDateTo('');
+
+        // Reset Company only if not forced
+        if (currentUser?.role !== 'company') {
+            setSelectedCompanyId('');
+        }
+
+        // Reset Map Mode
+        setMapColorMode('date');
+
+        showNotification("Filtros restablecidos", "success");
+    };
+
+    const hasActiveFilters = useMemo(() => {
+        return !!selectedFieldId || !!selectedCropId || !!searchTerm || !!dateFrom || !!dateTo || (currentUser?.role !== 'company' && !!selectedCompanyId);
+    }, [selectedFieldId, selectedCropId, searchTerm, dateFrom, dateTo, selectedCompanyId, currentUser]);
+
     // --- BASE FILTERS ---
     const baseFilterMatch = (item: any) => {
+
         if (selectedSeasonId && item.seasonId !== selectedSeasonId) return false;
         if (effectiveCompanyId && item.companyId !== effectiveCompanyId) return false;
         if (selectedFieldId && item.fieldId !== selectedFieldId) return false;
@@ -1097,26 +1127,31 @@ export const DashboardView: React.FC = () => {
 
 
     const handleExportExcel = () => {
-        const exportData = filteredSummaries.map(s => {
-            const company = data.companies.find(c => c.id === s.companyId)?.name || 'Desconocida';
-            const field = data.fields.find(f => f.id === s.fieldId)?.name || 'Desconocido';
-            const plot = data.plots.find(p => p.id === s.plotId)?.name || 'Desconocido';
-            return {
-                Fecha: new Date(s.date).toLocaleDateString(),
-                Empresa: company,
-                Campo: field,
-                Lote: plot,
-                'Estado Original': s.status,
-                'Notas Operario': s.notes || '',
-                'Revisado': s.isReviewed ? 'Sí' : 'No',
-                'Estado Ingeniero': s.engineerStatus || '',
-                'Feedback Ingeniero': s.engineerNotes || '',
-                'Audio Operario': s.audioUrl ? 'Sí' : 'No',
-                'Audio Ingeniero': s.engineerAudioUrl ? 'Sí' : 'No'
-            };
-        });
-        const dateStr = new Date().toISOString().split('T')[0];
-        Export.downloadExcel(exportData, `Cierres_Lotes_${dateStr}`);
+        showNotification("Generando Excel...", "success"); // UX Improvement: Immediate Feedback
+
+        // Timeout to allow UI digest cycle to show notification before heavy sync work
+        setTimeout(() => {
+            const exportData = filteredSummaries.map(s => {
+                const company = data.companies.find(c => c.id === s.companyId)?.name || 'Desconocida';
+                const field = data.fields.find(f => f.id === s.fieldId)?.name || 'Desconocido';
+                const plot = data.plots.find(p => p.id === s.plotId)?.name || 'Desconocido';
+                return {
+                    Fecha: new Date(s.date).toLocaleDateString(),
+                    Empresa: company,
+                    Campo: field,
+                    Lote: plot,
+                    'Estado Original': s.status,
+                    'Notas Operario': s.notes || '',
+                    'Revisado': s.isReviewed ? 'Sí' : 'No',
+                    'Estado Ingeniero': s.engineerStatus || '',
+                    'Feedback Ingeniero': s.engineerNotes || '',
+                    'Audio Operario': s.audioUrl ? 'Sí' : 'No',
+                    'Audio Ingeniero': s.engineerAudioUrl ? 'Sí' : 'No'
+                };
+            });
+            const dateStr = new Date().toISOString().split('T')[0];
+            Export.downloadExcel(exportData, `Cierres_Lotes_${dateStr}`);
+        }, 100);
     };
 
     // PDF Export Logic
@@ -1441,16 +1476,17 @@ export const DashboardView: React.FC = () => {
                     Tablero Agronómico
                 </h2>
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                    <Button variant="secondary" onClick={handleExportExcel} className="w-full sm:w-auto text-xs font-bold" disabled={filteredSummaries.length === 0}>
-                        <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> EXCEL
-                    </Button>
-                    <Button
-                        onClick={() => setIsReportWizardOpen(true)}
-                        variant="secondary"
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:scale-105 border-none transition-all"
-                    >
-                        <FileDown className="w-4 h-4" /> Informe
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <Button variant="secondary" onClick={handleExportExcel} className="w-full sm:w-auto text-xs font-bold border border-gray-200 shadow-sm" disabled={filteredSummaries.length === 0}>
+                            <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-green-600" /> EXCEL
+                        </Button>
+                        <Button
+                            onClick={() => setIsReportWizardOpen(true)}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm hover:shadow-md hover:scale-105 border-none transition-all"
+                        >
+                            <FileDown className="w-4 h-4" /> Informe
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -1489,6 +1525,19 @@ export const DashboardView: React.FC = () => {
 
                     {/* DYNAMIC CROP SELECTOR */}
                     <Select label="" placeholder="Cultivo..." options={availableCropsForFilter} value={selectedCropId} onChange={(e) => setSelectedCropId(e.target.value)} className="text-xs h-10" />
+
+                    {/* Clear Filters Button */}
+                    {hasActiveFilters && (
+                        <div className="flex items-end h-full pb-1">
+                            <button
+                                onClick={handleClearFilters}
+                                className="w-full h-9 flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-transparent hover:border-gray-300 rounded-lg transition-all text-xs font-bold uppercase"
+                                title="Limpiar todos los filtros"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" /> Limpiar
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1552,16 +1601,16 @@ export const DashboardView: React.FC = () => {
                         </div>
                     )}
 
-                    <span className="text-xs font-bold text-gray-500 uppercase hidden sm:inline">Vista:</span>
-                    <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg w-full sm:w-auto">
-                        <button onClick={() => setVisualMode('list')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-                            <LayoutList className="w-3 h-3 mr-1.5" /> Listado
+                    <span className="text-xs font-bold text-gray-400 uppercase hidden sm:inline mr-2">Vista</span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-lg border border-gray-100 dark:border-gray-700 w-full sm:w-auto">
+                        <button onClick={() => setVisualMode('list')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'list' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>
+                            <LayoutList className="w-3.5 h-3.5 mr-1.5" /> Listado
                         </button>
-                        <button onClick={() => setVisualMode('map')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'map' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-                            <MapIcon className="w-3 h-3 mr-1.5" /> Mapa
+                        <button onClick={() => setVisualMode('map')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'map' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>
+                            <MapIcon className="w-3.5 h-3.5 mr-1.5" /> Mapa
                         </button>
-                        <button onClick={() => setVisualMode('charts')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'charts' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-                            <BarChart2 className="w-3 h-3 mr-1.5" /> Gráficos
+                        <button onClick={() => setVisualMode('charts')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center ${visualMode === 'charts' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>
+                            <BarChart2 className="w-3.5 h-3.5 mr-1.5" /> Gráficos
                         </button>
                     </div>
                 </div>
