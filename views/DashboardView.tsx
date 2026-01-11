@@ -729,7 +729,7 @@ export const DashboardView: React.FC = () => {
 
                 doc.text(splitRec, 20, yPos + 8);
 
-                yPos += textHeight + 10;
+                yPos += textHeight + 25;
             }
 
             // --- 0.5 WEATHER FORECAST (GLOBAL / PAGE 1) ---
@@ -804,7 +804,7 @@ export const DashboardView: React.FC = () => {
             doc.text("LOTE", 60, yPos + 8);
             doc.text("CULTIVO", 100, yPos + 8);
             doc.text("ESTADO", 140, yPos + 8);
-            doc.text("ULT. RECORRIDA", 175, yPos + 8);
+            doc.text("FECHA", 175, yPos + 8);
             yPos += 12;
 
             // Rows
