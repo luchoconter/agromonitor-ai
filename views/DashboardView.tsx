@@ -692,16 +692,16 @@ export const DashboardView: React.FC = () => {
 
             // Logo placeholder or Title
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
+            doc.setFontSize(24);
             doc.setFont("helvetica", "bold");
             const companyName = data.companies.find(c => c.id === effectiveCompanyId)?.name || data.companies.find(c => c.id === sortedFields[0]?.companyId)?.name || 'Empresa';
             doc.text(`${companyName.toUpperCase()}`, 15, 20);
 
-            doc.setFontSize(12);
+            doc.setFontSize(14);
             doc.setFont("helvetica", "normal");
             doc.text(`INFORME DE SITUACIÓN INTEGRAL`, 15, 26);
 
-            doc.setFontSize(10);
+            doc.setFontSize(12);
             const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             doc.text(dateStr.charAt(0).toUpperCase() + dateStr.slice(1), pageWidth - 15, 20, { align: 'right' });
 
@@ -710,33 +710,33 @@ export const DashboardView: React.FC = () => {
             // --- 0. CONCLUSIÓN Y ESTRATEGIA (GLOBAL) ---
             if (recommendationText) {
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-                doc.setFontSize(14);
+                doc.setFontSize(16);
                 doc.setFont("helvetica", "bold");
                 doc.text("COMENTARIOS DEL INGENIERO", 15, yPos);
 
                 yPos += 7;
 
                 doc.setFont("helvetica", "normal");
-                doc.setFontSize(10);
+                doc.setFontSize(12);
                 doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
 
                 // Background for text
                 const splitRec = doc.splitTextToSize(recommendationText, pageWidth - 30);
-                const textHeight = splitRec.length * 5;
+                const textHeight = splitRec.length * 6;
 
                 doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
                 doc.roundedRect(15, yPos, pageWidth - 30, textHeight + 10, 2, 2, 'F');
 
                 doc.text(splitRec, 20, yPos + 8);
 
-                yPos += textHeight + 20;
+                yPos += textHeight + 10;
             }
 
             // --- 0.5 WEATHER FORECAST (GLOBAL / PAGE 1) ---
             if (weatherInfo) {
                 // Render Weather below Strategy or at top if no strategy
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-                doc.setFontSize(14);
+                doc.setFontSize(16);
                 doc.setFont("helvetica", "bold");
                 doc.text("PRONÓSTICO EXTENDIDO", 15, yPos);
                 yPos += 7;
@@ -764,16 +764,16 @@ export const DashboardView: React.FC = () => {
                     const dayNum = date.getDate();
 
                     // Day
-                    doc.setFontSize(8);
+                    doc.setFontSize(10);
                     doc.setFont("helvetica", "bold");
                     doc.text(`${dayName} ${dayNum}`, currentX + (itemWidth / 2), yPos + 10, { align: 'center' });
 
                     // Icon/Condition text
                     // (Simplified text mapping or just Temp)
-                    doc.setFontSize(9);
+                    doc.setFontSize(11);
                     doc.text(`${Math.round(maxTemps[i])}°`, currentX + (itemWidth / 2), yPos + 20, { align: 'center' });
 
-                    doc.setFontSize(8);
+                    doc.setFontSize(10);
                     doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
                     doc.text(`${Math.round(minTemps[i])}°`, currentX + (itemWidth / 2), yPos + 28, { align: 'center' });
                     doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
@@ -784,66 +784,28 @@ export const DashboardView: React.FC = () => {
                 yPos += 50;
             }
 
-            // --- 0.6 MAP OVERVIEW (GLOBAL) ---
-            setGenerationProgress('Capturando Mapa de Situación...');
-            setVisualMode('map');
-            setMapColorMode('status');
-            // Wait for map
-            await new Promise(resolve => setTimeout(resolve, 2500));
+            // Map Section removed as per request
 
-            if (mapContainerRef.current) {
-                doc.addPage();
-                fillBackground();
-                yPos = 20;
-
-                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text("1. MAPA DE CAMPO (SEMAFORIZADO)", 15, yPos);
-                yPos += 10;
-
-                try {
-                    const mapCanvas = await html2canvas(mapContainerRef.current, {
-                        scale: 3, // High resolution
-                        useCORS: true,
-                        allowTaint: true,
-                        backgroundColor: '#111827'
-                    });
-                    const mapImg = mapCanvas.toDataURL('image/jpeg', 0.85);
-                    const mapRatio = mapCanvas.height / mapCanvas.width;
-                    const mapHeight = Math.min((pageWidth - 30) * mapRatio, 160);
-
-                    doc.addImage(mapImg, 'JPEG', 15, yPos, pageWidth - 30, mapHeight);
-                    yPos += mapHeight + 15;
-                } catch (e) {
-                    console.warn("Map capture failed", e);
-                }
-            }
-
-            // Restore Charts mode for next section
-            setVisualMode('charts');
-            setGenerationProgress('Generando Tablas y Gráficos...');
-            await new Promise(resolve => setTimeout(resolve, 1500));
 
 
             // --- 1. GLOBAL LOT SITUATION (The consolidated table requested) ---
             doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-            doc.setFontSize(14);
+            doc.setFontSize(16);
             doc.setFont("helvetica", "bold");
-            doc.text("2. SITUACIÓN GENERAL DE LOTES", 15, yPos);
+            doc.text("1. SITUACIÓN GENERAL DE LOTES", 15, yPos);
             yPos += 10;
 
             // Table Header
             doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
-            doc.rect(15, yPos, pageWidth - 30, 10, 'F');
-            doc.setFontSize(10);
+            doc.rect(15, yPos, pageWidth - 30, 12, 'F');
+            doc.setFontSize(12);
             doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
-            doc.text("CAMPO", 20, yPos + 7);
-            doc.text("LOTE", 60, yPos + 7);
-            doc.text("CULTIVO", 100, yPos + 7);
-            doc.text("ESTADO", 140, yPos + 7);
-            doc.text("ULT. RECORRIDA", 175, yPos + 7);
-            yPos += 10;
+            doc.text("CAMPO", 20, yPos + 8);
+            doc.text("LOTE", 60, yPos + 8);
+            doc.text("CULTIVO", 100, yPos + 8);
+            doc.text("ESTADO", 140, yPos + 8);
+            doc.text("ULT. RECORRIDA", 175, yPos + 8);
+            yPos += 12;
 
             // Rows
             let globalPlots: any[] = [];
@@ -862,7 +824,7 @@ export const DashboardView: React.FC = () => {
                     fillBackground();
                     yPos = 20;
                     // Re-draw table header on new page? Optional, clean reports usually do.
-                    doc.setFontSize(8);
+                    doc.setFontSize(10);
                     doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
                     doc.text("Continuación...", 15, yPos - 5);
                 }
@@ -874,7 +836,7 @@ export const DashboardView: React.FC = () => {
                     doc.setFillColor(255, 255, 255); // Alpha not easy in pure jsPDF without GState, sticky to simple logic
                     // Dark mode alternating: default is bg, alternate is card
                     doc.setFillColor(31, 41, 55);
-                    doc.rect(15, yPos, pageWidth - 30, 8, 'F');
+                    doc.rect(15, yPos, pageWidth - 30, 12, 'F');
                 }
 
                 const fieldName = data.fields.find(f => f.id === plot.fieldId)?.name || '-';
@@ -887,13 +849,13 @@ export const DashboardView: React.FC = () => {
                 const status = latest ? (latest.engineerStatus || latest.status) : 'gris';
                 const lastDate = latest ? new Date(latest.date).toLocaleDateString() : '-';
 
-                doc.setFontSize(9);
+                doc.setFontSize(12);
                 doc.setFont("helvetica", "normal");
                 doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
 
-                doc.text(fieldName, 20, yPos + 5);
-                doc.text(plot.name, 60, yPos + 5);
-                doc.text(cropName, 100, yPos + 5);
+                doc.text(fieldName, 20, yPos + 8);
+                doc.text(plot.name, 60, yPos + 8);
+                doc.text(cropName, 100, yPos + 8);
 
                 // Status Badge logic
                 let r = 107, g = 114, b = 128; // gray
@@ -903,13 +865,13 @@ export const DashboardView: React.FC = () => {
 
                 doc.setTextColor(r, g, b);
                 doc.setFont("helvetica", "bold");
-                doc.text(status.toUpperCase(), 140, yPos + 5);
+                doc.text(status.toUpperCase(), 140, yPos + 8);
 
                 doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
                 doc.setFont("helvetica", "normal");
-                doc.text(lastDate, 175, yPos + 5);
+                doc.text(lastDate, 175, yPos + 8);
 
-                yPos += 8;
+                yPos += 12;
             });
 
             // --- 2. GLOBAL CHARTS ---
@@ -922,9 +884,9 @@ export const DashboardView: React.FC = () => {
                 }
 
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-                doc.setFontSize(14);
+                doc.setFontSize(16);
                 doc.setFont("helvetica", "bold");
-                doc.text("3. EVOLUCIÓN GLOBAL Y PLAGAS", 15, yPos);
+                doc.text("2. EVOLUCIÓN GLOBAL Y PLAGAS", 15, yPos);
                 yPos += 10;
 
                 try {
@@ -947,22 +909,22 @@ export const DashboardView: React.FC = () => {
             if (yPos + 20 > pageHeight - 20) { doc.addPage(); fillBackground(); yPos = 20; }
 
             doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-            doc.setFontSize(14);
+            doc.setFontSize(16);
             doc.setFont("helvetica", "bold");
-            doc.text("4. RESUMEN DE ACTIVIDAD POR CAMPO (30 Días)", 15, yPos);
+            doc.text("3. RESUMEN DE ACTIVIDAD POR CAMPO (30 Días)", 15, yPos);
             yPos += 10;
 
             // Table Header
             doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
-            doc.rect(15, yPos, pageWidth - 30, 10, 'F');
-            doc.setFontSize(9);
+            doc.rect(15, yPos, pageWidth - 30, 12, 'F');
+            doc.setFontSize(11); // Increased from 10 to 11
             doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
-            doc.text("CAMPO", 20, yPos + 7);
-            doc.text("LOTES / HAS", 70, yPos + 7);
-            doc.text("MUESTREOS", 110, yPos + 7); // Center alignment approx
-            doc.text("RECORRIDAS", 140, yPos + 7);
-            doc.text("RECETAS", 170, yPos + 7);
-            yPos += 10;
+            doc.text("CAMPO", 20, yPos + 8);
+            doc.text("LOTES / HAS", 70, yPos + 8);
+            doc.text("MUESTREOS", 110, yPos + 8); // Center alignment approx
+            doc.text("RECORRIDAS", 140, yPos + 8);
+            doc.text("RECETAS", 170, yPos + 8);
+            yPos += 12;
 
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -1003,29 +965,29 @@ export const DashboardView: React.FC = () => {
                     fillBackground();
                     yPos = 20;
                     // Header again
-                    doc.setFontSize(8);
+                    doc.setFontSize(10);
                     doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
                     doc.text("Continuación...", 15, yPos - 5);
                 }
 
                 if (index % 2 === 1) {
                     doc.setFillColor(31, 41, 55);
-                    doc.rect(15, yPos, pageWidth - 30, 8, 'F');
+                    doc.rect(15, yPos, pageWidth - 30, 12, 'F');
                 }
 
-                doc.setFontSize(9);
+                doc.setFontSize(12);
                 doc.setFont("helvetica", "bold");
                 doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
-                doc.text(field.name, 20, yPos + 5);
+                doc.text(field.name, 20, yPos + 8);
 
                 doc.setFont("helvetica", "normal");
-                doc.text(`${fieldPlots.length} Lotes | ${Math.round(totalHas)} Has`, 70, yPos + 5);
+                doc.text(`${fieldPlots.length} Lotes | ${Math.round(totalHas)} Has`, 70, yPos + 8);
 
-                doc.text(recentsMonitorings.toString(), 115, yPos + 5);
-                doc.text(recentSummaries.toString(), 145, yPos + 5);
-                doc.text(activeRecipes.toString(), 175, yPos + 5);
+                doc.text(recentsMonitorings.toString(), 115, yPos + 8);
+                doc.text(recentSummaries.toString(), 145, yPos + 8);
+                doc.text(activeRecipes.toString(), 175, yPos + 8);
 
-                yPos += 8;
+                yPos += 12;
             });
 
             yPos += 15;
@@ -1036,9 +998,9 @@ export const DashboardView: React.FC = () => {
                 if (yPos + 20 > pageHeight - 20) { doc.addPage(); fillBackground(); yPos = 20; }
 
                 doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
-                doc.setFontSize(14);
+                doc.setFontSize(16);
                 doc.setFont("helvetica", "bold");
-                doc.text("5. RECETAS PENDIENTES DE APLICACIÓN (GLOBAL)", 15, yPos);
+                doc.text("4. RECETAS PENDIENTES DE APLICACIÓN (GLOBAL)", 15, yPos);
                 yPos += 10;
 
                 allPendingRecipes.forEach(recipe => {
@@ -1047,18 +1009,18 @@ export const DashboardView: React.FC = () => {
 
                     // Card Background
                     doc.setFillColor(COLORS.card[0], COLORS.card[1], COLORS.card[2]);
-                    doc.roundedRect(15, yPos, pageWidth - 30, 28, 2, 2, 'F');
+                    doc.roundedRect(15, yPos, pageWidth - 30, 32, 2, 2, 'F');
 
                     // Left strip (Yellow for pending)
                     doc.setFillColor(234, 179, 8);
-                    doc.rect(15, yPos, 2, 28, 'F');
+                    doc.rect(15, yPos, 2, 32, 'F');
 
                     // Header Line: Date + Owner
                     doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
-                    doc.setFontSize(10);
+                    doc.setFontSize(12);
                     doc.setFont("helvetica", "bold");
                     const dateRec = new Date(recipe.createdAt).toLocaleDateString();
-                    doc.text(`Fecha: ${dateRec} - Ing: ${recipe.ownerName || 'N/A'}`, 20, yPos + 7);
+                    doc.text(`Fecha: ${dateRec} - Ing: ${recipe.ownerName || 'N/A'}`, 20, yPos + 8);
 
                     // Target Fields/Plots
                     const targetPlotIds = recipe.plotIds.filter((pid: string) => !recipe.executionData?.[pid]?.executed);
@@ -1068,10 +1030,10 @@ export const DashboardView: React.FC = () => {
                         return `${field?.name} - ${plot?.name}`;
                     }).join(', ') + (targetPlotIds.length > 5 ? '...' : '');
 
-                    doc.setFontSize(9);
+                    doc.setFontSize(11);
                     doc.setFont("helvetica", "normal");
                     doc.setTextColor(COLORS.textMuted[0], COLORS.textMuted[1], COLORS.textMuted[2]);
-                    doc.text(`Destino: ${plotNamesGroupedText}`, 20, yPos + 12);
+                    doc.text(`Destino: ${plotNamesGroupedText}`, 20, yPos + 14);
 
                     // Products
                     const products = recipe.items.map((i: any) => {
@@ -1330,10 +1292,10 @@ export const DashboardView: React.FC = () => {
             // BUDGET CAPTURE
             if (budgetContainerRef.current) {
                 checkPageBreak(120);
-                doc.setFontSize(14);
-                doc.setTextColor(22, 163, 74);
+                doc.setFontSize(16);
+                doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
                 doc.setFont("helvetica", "bold");
-                doc.text("6. EJECUCIÓN PRESUPUESTARIA", 15, yPos);
+                doc.text("5. EJECUCIÓN PRESUPUESTARIA", 15, yPos);
                 yPos += 10;
 
                 try {
@@ -1350,22 +1312,22 @@ export const DashboardView: React.FC = () => {
 
             // DETAILS TABLE
             checkPageBreak(40);
-            doc.setFontSize(14);
-            doc.setTextColor(22, 163, 74);
+            doc.setFontSize(16);
+            doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
             doc.setFont("helvetica", "bold");
-            doc.text("7. ESTADO DETALLADO DE LOTES", 15, yPos);
-            yPos += 8;
+            doc.text("6. ESTADO DETALLADO DE LOTES", 15, yPos);
+            yPos += 10;
 
             doc.setFillColor(240, 240, 240);
-            doc.rect(15, yPos, pageWidth - 30, 8, 'F');
-            doc.setFontSize(8);
+            doc.rect(15, yPos, pageWidth - 30, 12, 'F');
+            doc.setFontSize(11); // Increased from 10 to 11
             doc.setTextColor(0, 0, 0);
-            doc.text("LOTE", 18, yPos + 5);
-            doc.text("ESTADO", 60, yPos + 5);
-            doc.text("PRESUPUESTO", 85, yPos + 5);
-            doc.text("NOTA INGENIERO", 125, yPos + 5);
-            doc.text("RECETA", 185, yPos + 5);
-            yPos += 8;
+            doc.text("LOTE", 18, yPos + 8);
+            doc.text("ESTADO", 60, yPos + 8);
+            doc.text("PRESUPUESTO", 85, yPos + 8);
+            doc.text("NOTA INGENIERO", 125, yPos + 8);
+            doc.text("RECETA", 185, yPos + 8);
+            yPos += 12;
 
             doc.setFont("helvetica", "normal");
             filteredPlotsForTable.forEach((plot) => {
@@ -1383,14 +1345,16 @@ export const DashboardView: React.FC = () => {
                 if (status === 'rojo') statusColor = [239, 68, 68];
 
                 doc.setDrawColor(230, 230, 230);
-                doc.line(15, yPos + 8, pageWidth - 15, yPos + 8);
+                doc.line(15, yPos + 12, pageWidth - 15, yPos + 12);
 
                 doc.setTextColor(0, 0, 0);
-                doc.text(plot.name, 18, yPos + 5);
+                doc.setFontSize(12);
+                doc.text(plot.name, 18, yPos + 8);
 
                 doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
-                doc.circle(63, yPos + 4, 2, 'F');
-                doc.text(status.toUpperCase(), 68, yPos + 5);
+                doc.circle(63, yPos + 7, 2, 'F');
+                doc.setFontSize(10); // Status text slightly smaller to fit
+                doc.text(status.toUpperCase(), 68, yPos + 8);
 
                 const assignment = data.assignments.find(a => a.plotId === plot.id && a.seasonId === selectedSeasonId);
                 let budgetText = "-";
@@ -1402,17 +1366,19 @@ export const DashboardView: React.FC = () => {
                 } else {
                     doc.setTextColor(150, 150, 150);
                 }
-                doc.text(budgetText, 85, yPos + 5);
+                doc.setFontSize(11);
+                doc.text(budgetText, 85, yPos + 8);
                 doc.setTextColor(0, 0, 0);
 
                 const note = summary?.engineerNotes || summary?.notes || "-";
                 const noteLines = doc.splitTextToSize(note, 55);
-                doc.text(noteLines[0] + (noteLines.length > 1 ? '...' : ''), 125, yPos + 5);
+                doc.setFontSize(10);
+                doc.text(noteLines[0] + (noteLines.length > 1 ? '...' : ''), 125, yPos + 8);
 
                 const hasRecipe = data.prescriptions.some(p => p.plotIds.includes(plot.id) && p.status === 'active');
-                doc.text(hasRecipe ? "Sí" : "-", 187, yPos + 5);
+                doc.text(hasRecipe ? "Sí" : "-", 187, yPos + 8);
 
-                yPos += 8;
+                yPos += 12;
             });
 
             const totalPages = (doc.internal as any).getNumberOfPages();
