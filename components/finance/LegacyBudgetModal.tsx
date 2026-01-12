@@ -11,6 +11,64 @@ interface LegacyBudgetModalProps {
     onSave: () => void;
 }
 
+// Extracted InputGroup component to prevent focus loss and handle decimal inputs properly
+interface InputGroupProps {
+    label: string;
+    value: number;
+    onChange: (val: number) => void;
+}
+
+const InputGroup: React.FC<InputGroupProps> = ({ label, value, onChange }) => {
+    // Local state to handle string input allowing intermediate states like "0."
+    const [localValue, setLocalValue] = useState(value?.toString() || '0');
+
+    // Sync validation with prop only when the numeric value changes effectively
+    useEffect(() => {
+        // If the parsed local value is different from the prop, update local.
+        // This prevents overwriting "0." (parsed 0) with "0" (prop 0) while typing.
+        if (parseFloat(localValue) !== value) {
+            setLocalValue(value?.toString() || '0');
+        }
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newVal = e.target.value;
+        setLocalValue(newVal);
+
+        if (newVal === '') {
+            onChange(0);
+            return;
+        }
+
+        const parsed = parseFloat(newVal);
+        if (!isNaN(parsed)) {
+            onChange(parsed);
+        }
+    };
+
+    return (
+        <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{label}</label>
+            <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="w-full pl-6 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none
+                               bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+                    value={localValue}
+                    onChange={handleChange}
+                    onBlur={() => {
+                        // On blur, format strictly to the number from props to clean up specific inputs like "000" or "."
+                        setLocalValue(value.toString());
+                    }}
+                />
+            </div>
+        </div>
+    );
+};
+
 export const LegacyBudgetModal: React.FC<LegacyBudgetModalProps> = ({ isOpen, onClose, budget, cropName, onSave }) => {
     const [formData, setFormData] = useState<Budget['legacySpent']>({
         herbicidas: 0, insecticidas: 0, fungicidas: 0, fertilizantes: 0,
@@ -53,23 +111,9 @@ export const LegacyBudgetModal: React.FC<LegacyBudgetModalProps> = ({ isOpen, on
 
     if (!isOpen) return null;
 
-    const InputGroup = ({ label, field }: { label: string, field: keyof typeof formData }) => (
-        <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{label}</label>
-            <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="w-full pl-6 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none
-                               bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
-                    value={formData?.[field] || ''}
-                    onChange={e => setFormData(prev => ({ ...prev!, [field]: parseFloat(e.target.value) || 0 }))}
-                />
-            </div>
-        </div>
-    );
+    const handleFieldChange = (field: keyof typeof formData, val: number) => {
+        setFormData(prev => ({ ...prev!, [field]: val }));
+    };
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -94,24 +138,24 @@ export const LegacyBudgetModal: React.FC<LegacyBudgetModalProps> = ({ isOpen, on
                     <div>
                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3 pb-1 border-b">Insumos</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            <InputGroup label="Herbicidas" field="herbicidas" />
-                            <InputGroup label="Insecticidas" field="insecticidas" />
-                            <InputGroup label="Fungicidas" field="fungicidas" />
-                            <InputGroup label="Fertilizantes" field="fertilizantes" />
-                            <InputGroup label="Coadyuvantes" field="coadyuvantes" />
-                            <InputGroup label="Semillas" field="semillas" />
-                            <InputGroup label="Otros" field="otrosAgroquimicos" />
+                            <InputGroup label="Herbicidas" value={formData.herbicidas} onChange={(v) => handleFieldChange('herbicidas', v)} />
+                            <InputGroup label="Insecticidas" value={formData.insecticidas} onChange={(v) => handleFieldChange('insecticidas', v)} />
+                            <InputGroup label="Fungicidas" value={formData.fungicidas} onChange={(v) => handleFieldChange('fungicidas', v)} />
+                            <InputGroup label="Fertilizantes" value={formData.fertilizantes} onChange={(v) => handleFieldChange('fertilizantes', v)} />
+                            <InputGroup label="Coadyuvantes" value={formData.coadyuvantes} onChange={(v) => handleFieldChange('coadyuvantes', v)} />
+                            <InputGroup label="Semillas" value={formData.semillas} onChange={(v) => handleFieldChange('semillas', v)} />
+                            <InputGroup label="Otros" value={formData.otrosAgroquimicos} onChange={(v) => handleFieldChange('otrosAgroquimicos', v)} />
                         </div>
                     </div>
 
                     <div>
                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3 pb-1 border-b">Labores</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            <InputGroup label="Siembra" field="siembra" />
-                            <InputGroup label="Pulv. Terrestre" field="pulverizacionTerrestre" />
-                            <InputGroup label="Pulv. Aérea" field="pulverizacionAerea" />
-                            <InputGroup label="Pulv. Selectiva" field="pulverizacionSelectiva" />
-                            <InputGroup label="Otras Labores" field="otrasLabores" />
+                            <InputGroup label="Siembra" value={formData.siembra} onChange={(v) => handleFieldChange('siembra', v)} />
+                            <InputGroup label="Pulv. Terrestre" value={formData.pulverizacionTerrestre} onChange={(v) => handleFieldChange('pulverizacionTerrestre', v)} />
+                            <InputGroup label="Pulv. Aérea" value={formData.pulverizacionAerea} onChange={(v) => handleFieldChange('pulverizacionAerea', v)} />
+                            <InputGroup label="Pulv. Selectiva" value={formData.pulverizacionSelectiva} onChange={(v) => handleFieldChange('pulverizacionSelectiva', v)} />
+                            <InputGroup label="Otras Labores" value={formData.otrasLabores} onChange={(v) => handleFieldChange('otrasLabores', v)} />
                         </div>
                     </div>
                 </form>
